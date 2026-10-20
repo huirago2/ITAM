@@ -176,7 +176,12 @@ const CS_KINDS = ['잉크', '토너', '헤드', '유지보수키트'];
 const LIFE_ST = ['정상', '구매 소요 확정 대상', '불용 대상'];
 const WLABEL = { 정: '정 담당자', 부: '부 담당자' };
 const DEPTS = ['행정과', '기획예산과', '민원과', '총무과', '재무과', '감사실', '정보통신과', '시설관리과', '복지정책과', '교육지원과', '안전관리과', '홍보담당관'];
-const POSITIONS = ['주무관', '팀장', '과장', '계장', '실장'];
+const SAMPLE_PARENTS = { // 샘플용 가상 상위부서
+  행정과: '행정지원국', 총무과: '행정지원국', 민원과: '행정지원국', 정보통신과: '행정지원국',
+  기획예산과: '기획조정실', 재무과: '기획조정실', 감사실: '기획조정실', 홍보담당관: '기획조정실',
+  복지정책과: '복지교육국', 교육지원과: '복지교육국', 시설관리과: '안전건설국', 안전관리과: '안전건설국',
+};
+const POSITIONS =['주무관', '팀장', '과장', '계장', '실장'];
 const RENTAL_LOC = '정보통신지원센터(대여 보관)';
 const PAGE = 100;
 
@@ -298,6 +303,7 @@ function normalize(d) {
     d.equipment.forEach(e => e.location && e.location !== RENTAL_LOC && s.add(e.location));
     d.settings.depts = [...s];
   }
+  if (!d.settings.deptParents || typeof d.settings.deptParents !== 'object') d.settings.deptParents = {}; // 부서명 → 상위부서명
   d.version = d.version || APP_VERSION;
   return d;
 }
@@ -340,19 +346,19 @@ function resetSample() {
   DB = makeSample(); loadedName = null; dirty = false; persist(); setBaseline(); S.screen = 'home'; S.tsort = {}; render();
   toast('샘플 데이터로 초기화했습니다.');
 }
-function emptyData(depts) {
+function emptyData(depts, parents = {}) {
   return normalize({
     version: APP_VERSION, models: [], equipment: [], loans: [], consumables: [], stockLogs: [], wasteLogs: [],
-    settings: { budgets: {}, reportExports: {}, purchasePlans: {}, fileInfo: null, depts: depts.slice(), dataKind: 'real' }
+    settings: { budgets: {}, reportExports: {}, purchasePlans: {}, fileInfo: null, depts: depts.slice(), deptParents: Object.assign({}, parents), dataKind: 'real' }
   });
 }
 function startEmpty() {
   const hasReal = DB.settings.dataKind !== 'sample' && (DB.models.length || DB.consumables.length);
-  const msg = '빈 데이터로 시작할까요?\n\n장비모델·장비·대여 기록·소모품·입출고·폐토너 기록·예산·보고 이력이 모두 비워집니다.\n부서 목록과 작업자 선택은 그대로 유지됩니다.'
+  const msg = '빈 데이터로 시작할까요?\n\n장비모델·장비·대여 기록·소모품·입출고·폐토너 기록·예산·보고 이력이 모두 비워집니다.\n부서 목록(상위부서 포함)과 작업자 선택은 그대로 유지됩니다.'
     + (hasReal ? '\n\n⚠ 지금은 실제 데이터입니다. 필요하면 먼저 [저장]으로 백업하세요.' : '')
     + (dirty ? '\n\n※ 저장하지 않은 변경 사항이 있습니다!' : '');
   if (!confirm(msg)) return;
-  DB = emptyData(DB.settings.depts); loadedName = null; dirty = true; persist(); setBaseline('new');
+  DB = emptyData(DB.settings.depts, DB.settings.deptParents); loadedName = null; dirty = true; persist(); setBaseline('new');
   S.screen = 'home'; S.tsort = {}; S.rp = null; S.pq = null; render();
   toast('빈 데이터로 시작합니다. 장비모델부터 등록하세요.');
 }
@@ -397,8 +403,10 @@ function computeChanges() {
   });
   const bs = BASE.settings || {}, s = DB.settings;
   const bd = new Set(bs.depts || []), nd = new Set(s.depts || []);
-  nd.forEach(x => { if (!bd.has(x)) out.push({ cat: '부서', type: '추가', name: x, details: [] }); });
+  nd.forEach(x => { if (!bd.has(x)) out.push({ cat: '부서', type: '추가', name: x, details: (s.deptParents || {})[x] ? [{ f: '상위부서', from: '(없음)', to: s.deptParents[x] }] : [] }); });
   bd.forEach(x => { if (!nd.has(x)) out.push({ cat: '부서', type: '삭제', name: x, details: [] }); });
+  const bp = bs.deptParents || {}, np = s.deptParents || {};
+  nd.forEach(x => { if (bd.has(x) && (bp[x] || '') !== (np[x] || '')) out.push({ cat: '부서', type: '수정', name: x, details: [{ f: '상위부서', from: bp[x] || '(미지정)', to: np[x] || '(미지정)' }] }); });
   const qLabel = k => { const [y, q] = k.split('-'); return `${y}년 ${q}분기`; };
   new Set([...Object.keys(bs.budgets || {}), ...Object.keys(s.budgets || {})]).forEach(k => {
     const o = (bs.budgets || {})[k], n = s.budgets[k];
@@ -626,7 +634,7 @@ function makeSample() {
   const prevY = cq === 1 ? Y - 1 : Y, prevQ = cq === 1 ? 4 : cq - 1;
   const reportExports = {};
   reportExports[`${prevY}-${prevQ}`] = new Date(pd(qStart(prevY, prevQ)).getTime() + 3 * 86400000 + 10 * 3600000).toISOString();
-  return normalize({ version: APP_VERSION, models, equipment, loans, consumables, stockLogs, wasteLogs, settings: { budgets, reportExports, purchasePlans: {}, fileInfo: null, depts: DEPTS.slice(), dataKind: 'sample' } });
+  return normalize({ version: APP_VERSION, models, equipment, loans, consumables, stockLogs, wasteLogs, settings: { budgets, reportExports, purchasePlans: {}, fileInfo: null, depts: DEPTS.slice(), deptParents: Object.assign({}, SAMPLE_PARENTS), dataKind: 'sample' } });
 }
 
 /* =====================================================================
@@ -719,72 +727,113 @@ function deptUsage() {
   DB.wasteLogs.forEach(w => { if (w.kind === '추가회수' && w.dept) g(w.dept).waste += w.qty; });
   return u;
 }
+const parentOf = d => (DB.settings.deptParents || {})[d] || '';
+function parentNames() { return [...new Set(Object.values(DB.settings.deptParents).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko')); }
+function setParent(d, p) { p = (p || '').trim(); if (p) DB.settings.deptParents[d] = p; else delete DB.settings.deptParents[d]; }
+function sortByParent(a, b) { const pa = parentOf(a), pb = parentOf(b); return (!pa - !pb) || pa.localeCompare(pb, 'ko') || a.localeCompare(b, 'ko'); }
 function renderDepts() {
-  const u = deptUsage(), list = DB.settings.depts.slice().sort((a, b) => a.localeCompare(b, 'ko'));
+  if (!S.df) S.df = { parent: '' };
+  const u = deptUsage(), pf = S.df.parent;
+  const list = DB.settings.depts.filter(d => !pf || (pf === '__none' ? !parentOf(d) : parentOf(d) === pf)).sort(sortByParent);
   const z = { eq: 0, loan: 0, active: 0, out: 0, waste: 0 };
   const row = (d, listed) => {
-    const x = u[d] || z;
-    return `<tr><td><b>${h(d)}</b></td><td class="n">${fmtN(x.eq)}</td><td class="n">${fmtN(x.loan)}</td><td class="n">${x.active ? `<span class="txt-orange">${x.active}</span>` : 0}</td><td class="n">${fmtN(x.out)}</td><td class="n">${fmtN(x.waste)}</td>
-      <td>${listed ? `<button class="btn sm" onclick="renameDeptModal(${ja(d)})">이름 변경</button> <button class="btn sm danger" onclick="delDept(${ja(d)})">삭제</button>`
-        : `<button class="btn sm primary" onclick="ensureDept(${ja(d)});changed('부서 목록에 추가했습니다.')">목록에 추가</button> <button class="btn sm" onclick="renameDeptModal(${ja(d)})">다른 이름으로 바꾸기</button>`}</td></tr>`;
+    const x = u[d] || z, p = listed ? parentOf(d) : '';
+    return `<tr><td>${p ? h(p) : '<span class="muted">(미지정)</span>'}</td><td><b>${h(d)}</b></td><td class="n">${fmtN(x.eq)}</td><td class="n">${fmtN(x.loan)}</td><td class="n">${x.active ? `<span class="txt-orange">${x.active}</span>` : 0}</td><td class="n">${fmtN(x.out)}</td><td class="n">${fmtN(x.waste)}</td>
+      <td>${listed ? `<button class="btn sm" onclick="deptModal(${ja(d)})">수정</button> <button class="btn sm danger" onclick="delDept(${ja(d)})">삭제</button>`
+        : `<button class="btn sm primary" onclick="ensureDept(${ja(d)});changed('부서 목록에 추가했습니다.')">목록에 추가</button> <button class="btn sm" onclick="deptModal(${ja(d)})">다른 이름으로 바꾸기</button>`}</td></tr>`;
   };
   const unlisted = Object.keys(u).filter(d => !DB.settings.depts.includes(d)).sort((a, b) => a.localeCompare(b, 'ko'));
-  const head = `<thead><tr><th>부서명</th><th class="n">설치 장비(대)</th><th class="n">대여(건)</th><th class="n">대여 중</th><th class="n">소모품 불출(개)</th><th class="n">폐토너 추가 회수</th><th></th></tr></thead>`;
+  const head = `<thead><tr><th>상위부서명</th><th>부서명</th><th class="n">설치 장비(대)</th><th class="n">대여(건)</th><th class="n">대여 중</th><th class="n">소모품 불출(개)</th><th class="n">폐토너 추가 회수</th><th></th></tr></thead>`;
+  const parents = parentNames();
+  const noParent = DB.settings.depts.filter(d => !parentOf(d)).length;
   return `<h2>부서 관리</h2>
   <div class="panel">
-    <div class="filters"><input id="dpNew" placeholder="새 부서명 (예: 도시계획과)" onkeydown="if(event.key==='Enter')addDept()"><button class="btn primary" onclick="addDept()">+ 추가</button>
-      <button class="btn" onclick="bulkDeptModal()">여러 부서 한 번에 추가</button><div class="spacer"></div><span class="muted">${list.length}개 부서</span></div>
-    <div class="muted" style="margin-bottom:10px">여기 등록한 부서가 대여 부서·수령부서·위치 입력칸의 자동완성 목록으로 나옵니다. 이름을 바꾸면 그 부서로 남은 장비 위치·대여·불출·폐토너 기록도 모두 함께 바뀝니다.</div>
-    <div class="tablewrap"><table class="t">${head}<tbody>${list.map(d => row(d, true)).join('') || '<tr><td colspan="7" class="empty">등록된 부서가 없습니다.</td></tr>'}</tbody></table></div>
+    <div class="filters">
+      <input id="dpParent" list="dlParent" placeholder="상위부서명 (예: 행정지원국)" style="width:170px">
+      <input id="dpNew" placeholder="부서명 (예: 도시계획과)" onkeydown="if(event.key==='Enter')addDept()"><button class="btn primary" onclick="addDept()">+ 추가</button>
+      <button class="btn" onclick="bulkDeptModal()">여러 부서 한 번에 추가</button>
+      <datalist id="dlParent">${parents.map(p => `<option value="${h(p)}">`).join('')}</datalist>
+      <div class="spacer"></div>
+      <label>상위부서</label>${fSel('dfParent', [['', `전체 (${DB.settings.depts.length})`], ...parents.map(p => [p, `${p} (${DB.settings.depts.filter(d => parentOf(d) === p).length})`]), ...(noParent ? [['__none', `(미지정) (${noParent})`]] : [])], pf, `onchange="S.df.parent=this.value;render()"`)}
+      ${pf && pf !== '__none' ? `<button class="btn sm" onclick="renameParentModal(${ja(pf)})">상위부서명 변경</button>` : ''}
+    </div>
+    <div class="muted" style="margin-bottom:10px">여기 등록한 부서가 대여 부서·수령부서·위치 입력칸의 자동완성 목록으로 나옵니다. 상위부서명은 이 화면에서만 관리·표시하며, 다른 화면에는 부서명만 나옵니다. 부서명을 바꾸면 그 부서로 남은 장비 위치·대여·불출·폐토너 기록도 모두 함께 바뀝니다.</div>
+    <div class="tablewrap"><table class="t">${head}<tbody>${list.map(d => row(d, true)).join('') || '<tr><td colspan="8" class="empty">해당 부서가 없습니다.</td></tr>'}</tbody></table></div>
   </div>
   ${unlisted.length ? `<div class="panel"><h3>목록에 없는 부서명 <span class="muted">기록에는 쓰였지만 부서 목록에 없는 이름 — 오타라면 [다른 이름으로 바꾸기]로 정리하세요</span></h3>
     <div class="tablewrap"><table class="t">${head}<tbody>${unlisted.map(d => row(d, false)).join('')}</tbody></table></div></div>` : ''}`;
 }
 function addDept() {
-  const el = document.getElementById('dpNew'), n = el.value.trim();
+  const el = document.getElementById('dpNew'), n = el.value.trim(), p = document.getElementById('dpParent').value.trim();
   if (!n) { el.focus(); return; }
   if (n === RENTAL_LOC) { alert('이 이름은 대여 장비 보관 위치로 쓰이므로 부서로 등록할 수 없습니다.'); return; }
-  if (DB.settings.depts.includes(n)) { alert('이미 등록된 부서입니다.'); return; }
-  DB.settings.depts.push(n); el.value = ''; changed(`${n}을(를) 추가했습니다.`);
+  if (DB.settings.depts.includes(n)) { alert('이미 등록된 부서입니다. 상위부서를 바꾸려면 [수정]을 누르세요.'); return; }
+  DB.settings.depts.push(n); setParent(n, p); el.value = ''; changed(`${n}을(를) 추가했습니다.`);
+  const pe = document.getElementById('dpParent'); if (pe) pe.value = p; // 같은 상위부서로 이어서 입력
   const again = document.getElementById('dpNew'); if (again) again.focus();
 }
 function bulkDeptModal() {
   openModal('여러 부서 한 번에 추가',
-    `<div class="muted" style="margin-bottom:8px">한 줄에 부서 하나씩 입력하거나, 엑셀의 부서 열을 복사해 붙여넣으세요. 이미 있는 부서는 건너뜁니다.</div>
-     <textarea id="dpBulk" rows="10" style="width:100%;padding:8px;border:1px solid #c9d2e0;border-radius:4px" placeholder="도시계획과&#10;환경과&#10;세무과"></textarea>`,
+    `<div class="muted" style="margin-bottom:8px">한 줄에 하나씩 <b>상위부서명, 부서명</b> 순서로 입력하세요. 엑셀에서 두 열(상위부서·부서)을 복사해 붙여넣어도 됩니다.<br>
+     부서명만 적으면 상위부서는 비워 둡니다. 이미 있는 부서에 상위부서를 적으면 상위부서만 바꿉니다.</div>
+     <textarea id="dpBulk" rows="10" style="width:100%;padding:8px;border:1px solid #c9d2e0;border-radius:4px" placeholder="도시건설국, 도시계획과&#10;도시건설국, 건축과&#10;세무과"></textarea>`,
     () => {
-      const names = [...new Set(gv('dpBulk').split(/[\r\n\t,]+/).map(s => s.trim()).filter(s => s && s !== RENTAL_LOC))];
-      const add = names.filter(n => !DB.settings.depts.includes(n));
-      if (!add.length) return mErr('추가할 새 부서가 없습니다.');
-      DB.settings.depts.push(...add); changed(`${add.length}개 부서를 추가했습니다.`);
+      let add = 0, upd = 0;
+      gv('dpBulk').split(/\r?\n/).map(s => s.trim()).filter(Boolean).forEach(line => {
+        const parts = line.split(/\t|,/).map(s => s.trim()).filter(Boolean);
+        const name = parts.length >= 2 ? parts[1] : parts[0], parent = parts.length >= 2 ? parts[0] : '';
+        if (!name || name === RENTAL_LOC) return;
+        if (!DB.settings.depts.includes(name)) { DB.settings.depts.push(name); setParent(name, parent); add++; }
+        else if (parent && parentOf(name) !== parent) { setParent(name, parent); upd++; }
+      });
+      if (!add && !upd) return mErr('추가하거나 바꿀 부서가 없습니다.');
+      changed(`부서 ${add}개 추가${upd ? `, 상위부서 ${upd}개 변경` : ''}`);
     }, '추가');
 }
-function renameDeptModal(old) {
+function deptModal(old) {
   const x = deptUsage()[old] || { eq: 0, loan: 0, out: 0, waste: 0 };
-  openModal(`부서 이름 변경 · ${old}`,
+  const listed = DB.settings.depts.includes(old);
+  openModal(listed ? `부서 수정 · ${old}` : `부서명 바꾸기 · ${old}`,
     `<div class="kv"><span>설치 장비 <b>${x.eq}</b>대</span><span>대여 <b>${x.loan}</b>건</span><span>불출 <b>${x.out}</b>개</span><span>폐토너 회수 <b>${x.waste}</b>개</span></div>` +
-    fRow('새 이름', fIn('dpName', old, 'text', 'list="dlDept"'), true) +
-    `<div class="hint" style="margin-left:0">이 부서로 기록된 장비 위치·대여·불출·폐토너 기록이 모두 새 이름으로 바뀝니다. 이미 있는 부서명을 입력하면 두 부서가 하나로 합쳐집니다.</div>`,
+    fRow('상위부서명', fIn('dpP', parentOf(old), 'text', 'list="dlParentM" placeholder="비우면 미지정"')) +
+    `<datalist id="dlParentM">${parentNames().map(p => `<option value="${h(p)}">`).join('')}</datalist>` +
+    fRow('부서명', fIn('dpName', old, 'text', 'list="dlDept"'), true) +
+    `<div class="hint" style="margin-left:0">부서명을 바꾸면 이 부서로 기록된 장비 위치·대여·불출·폐토너 기록이 모두 새 이름으로 바뀝니다. 이미 있는 부서명을 입력하면 두 부서가 하나로 합쳐집니다.</div>`,
     () => {
-      const neu = gv('dpName');
-      if (!neu) return mErr('새 이름을 입력하세요.');
+      const neu = gv('dpName'), p = gv('dpP');
+      if (!neu) return mErr('부서명을 입력하세요.');
       if (neu === RENTAL_LOC) return mErr('이 이름은 대여 장비 보관 위치로 쓰여 사용할 수 없습니다.');
-      if (neu === old) return;
-      if (DB.settings.depts.includes(neu) && !confirm(`"${neu}" 부서가 이미 있습니다. "${old}"의 기록을 "${neu}"로 합칠까요?`)) return false;
+      if (neu === old) { if (!listed) DB.settings.depts.push(neu); setParent(neu, p); changed('부서 정보를 저장했습니다.'); return; }
+      const merging = DB.settings.depts.includes(neu);
+      if (merging && !confirm(`"${neu}" 부서가 이미 있습니다. "${old}"의 기록을 "${neu}"로 합칠까요?`)) return false;
       let n = 0;
       DB.equipment.forEach(e => { if (e.location === old) { e.location = neu; n++; } });
       DB.loans.forEach(l => { if (l.dept === old) { l.dept = neu; n++; } });
       DB.stockLogs.forEach(l => { if (l.dept === old) { l.dept = neu; n++; } });
       DB.wasteLogs.forEach(l => { if (l.dept === old) { l.dept = neu; n++; } });
-      DB.settings.depts = [...new Set(DB.settings.depts.map(d => d === old ? neu : d).concat(DB.settings.depts.includes(old) ? [] : [neu]))];
+      DB.settings.depts = [...new Set(DB.settings.depts.map(d => d === old ? neu : d).concat(listed ? [] : [neu]))];
+      delete DB.settings.deptParents[old];
+      if (p || !merging) setParent(neu, p); // 합칠 때 상위부서를 비워 두면 기존 부서의 상위부서 유지
       changed(`"${old}" → "${neu}" 변경 (기록 ${n}건 반영)`);
+    }, '저장');
+}
+function renameParentModal(old) {
+  const n = DB.settings.depts.filter(d => parentOf(d) === old).length;
+  openModal(`상위부서명 변경 · ${old}`,
+    fRow('새 상위부서명', fIn('dpPN', old, 'text', 'list="dlParentM"'), true) +
+    `<datalist id="dlParentM">${parentNames().map(p => `<option value="${h(p)}">`).join('')}</datalist>` +
+    `<div class="hint" style="margin-left:0">이 상위부서에 속한 부서 ${n}개의 상위부서명이 모두 바뀝니다. 이미 있는 상위부서명을 입력하면 하나로 합쳐집니다.</div>`,
+    () => {
+      const neu = gv('dpPN'); if (!neu) return mErr('새 상위부서명을 입력하세요.');
+      Object.keys(DB.settings.deptParents).forEach(d => { if (DB.settings.deptParents[d] === old) DB.settings.deptParents[d] = neu; });
+      S.df.parent = neu; changed(`상위부서 "${old}" → "${neu}" (${n}개 부서)`);
     }, '변경');
 }
 function delDept(d) {
   const x = deptUsage()[d];
   const used = x && (x.eq || x.loan || x.out || x.waste);
-  if (!confirm(`"${d}"을(를) 부서 목록에서 삭제할까요?` + (used ? `\n\n이 부서로 남은 기록(장비 ${x.eq}대, 대여 ${x.loan}건 등)은 지워지지 않고 이름이 그대로 남습니다.\n부서가 다른 부서로 바뀐 경우라면 [이름 변경]으로 합치는 것이 좋습니다.` : ''))) return;
-  DB.settings.depts = DB.settings.depts.filter(x => x !== d); changed('부서를 삭제했습니다.');
+  if (!confirm(`"${d}"을(를) 부서 목록에서 삭제할까요?` + (used ? `\n\n이 부서로 남은 기록(장비 ${x.eq}대, 대여 ${x.loan}건 등)은 지워지지 않고 이름이 그대로 남습니다.\n부서가 다른 부서로 바뀐 경우라면 [수정]에서 부서명을 바꿔 합치는 것이 좋습니다.` : ''))) return;
+  DB.settings.depts = DB.settings.depts.filter(x => x !== d); delete DB.settings.deptParents[d]; changed('부서를 삭제했습니다.');
 }
 
 /* ---------- 표 정렬 (모든 표 공통) ----------
@@ -1349,9 +1398,9 @@ function csLabel(c) { return `${c.printerModel} · ${c.kind} · ${c.name}`; }
 function sortCs(a, b) { return cmp(a.printerModel, b.printerModel) || CS_KINDS.indexOf(a.kind) - CS_KINDS.indexOf(b.kind) || cmp(a.name, b.name); }
 
 function renderCons() {
-  const tabs = [['stock', '소모품 재고'], ['logs', '입출고 기록'], ['waste', '폐토너 관리'], ['cmp', '소모량 비교'], ['plan', '분기 구매 소요표']];
+  const tabs = [['stock', '소모품 재고'], ['logs', '입출고 기록'], ['monthly', '월별 불출 현황'], ['waste', '폐토너 관리'], ['cmp', '소모량 비교'], ['plan', '분기 구매 소요표']];
   const sub = `<div class="subtabs">${tabs.map(([k, l]) => `<button class="${S.csTab === k ? 'on' : ''}" onclick="S.csTab='${k}';render()">${l}</button>`).join('')}</div>`;
-  const body = { stock: renderStock, logs: renderLogs, waste: renderWaste, cmp: renderCmp, plan: renderPlan }[S.csTab]();
+  const body = { stock: renderStock, logs: renderLogs, monthly: renderMonthly, waste: renderWaste, cmp: renderCmp, plan: renderPlan }[S.csTab]();
   return `<h2>소모품 (운영용품)</h2>${sub}${body}`;
 }
 function renderStock() {
@@ -1630,6 +1679,69 @@ function exportWaste() {
   else sh.rows.push([{ v: '미반납 없음', s: X.cell }]);
   download(buildXlsx([sh]), `폐토너현황_${stamp()}.xlsx`);
   toast('폐토너 현황 엑셀을 내려받았습니다.');
+}
+
+/* ---------- 월별 불출 현황 ---------- */
+function monthlyData() {
+  const t = TODAY(), M = S.mf;
+  const Y = String(M.year || t.slice(0, 4));
+  const csMap = {}; DB.consumables.forEach(c => csMap[c.id] = c);
+  const groups = {};
+  DB.stockLogs.forEach(l => {
+    if (l.kind !== '불출' || !l.date.startsWith(Y)) return;
+    const c = csMap[l.consumableId]; if (!c) return;
+    if (M.kind && c.kind !== M.kind) return;
+    const key = M.by === 'dept' ? (l.dept || '(부서 없음)') : M.by === 'printer' ? c.printerModel : c.id;
+    if (!groups[key]) groups[key] = { key, c: M.by === 'item' ? c : null, m: Array(12).fill(0) };
+    const v = M.unit === 'amount' ? l.qty * (Number(c.price) || 0) : l.qty;
+    groups[key].m[+l.date.slice(5, 7) - 1] += v;
+  });
+  if (M.by === 'item') DB.consumables.forEach(c => { if ((!M.kind || c.kind === M.kind) && !groups[c.id]) groups[c.id] = { key: c.id, c, m: Array(12).fill(0) }; });
+  const rows = Object.values(groups).map(g => Object.assign(g, { total: g.m.reduce((a, b) => a + b, 0) }));
+  if (M.by === 'item') rows.sort((a, b) => sortCs(a.c, b.c)); else rows.sort((a, b) => b.total - a.total || a.key.localeCompare(b.key, 'ko'));
+  const colTot = Array(12).fill(0); rows.forEach(r => r.m.forEach((v, i) => colTot[i] += v));
+  const lastMonth = Y === t.slice(0, 4) ? +t.slice(5, 7) : 12; // 올해는 이번 달까지
+  return { Y, rows, colTot, total: colTot.reduce((a, b) => a + b, 0), lastMonth };
+}
+function renderMonthly() {
+  if (!S.mf) S.mf = { year: '', by: 'item', unit: 'qty', kind: '' };
+  const M = S.mf, D = monthlyData(), t = TODAY();
+  const years = [...new Set([t.slice(0, 4), ...DB.stockLogs.filter(l => l.kind === '불출').map(l => l.date.slice(0, 4))])].sort().reverse();
+  const fmtV = v => v ? fmtN(v) : '<span class="muted">-</span>';
+  const lead = M.by === 'item' ? '<th>프린터 모델</th><th>종류</th><th>품명</th>' : M.by === 'dept' ? '<th>부서</th>' : '<th>프린터 모델</th>';
+  const leadN = M.by === 'item' ? 3 : 1;
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const avgDiv = Math.max(1, D.lastMonth);
+  const body = D.rows.map(r => `<tr>${M.by === 'item' ? `<td>${h(r.c.printerModel)}</td><td>${h(r.c.kind)}</td><td>${h(r.c.name)}</td>` : `<td>${h(r.key)}</td>`}
+    ${r.m.map((v, i) => `<td class="n" data-v="${v}"${i + 1 > D.lastMonth ? ' style="background:#fafafa"' : ''}>${fmtV(v)}</td>`).join('')}<td class="n" data-v="${r.total}"><b>${fmtN(r.total)}</b></td><td class="n" data-v="${r.total / avgDiv}">${fmt1(r.total / avgDiv)}</td></tr>`).join('');
+  const foot = `<tr class="total"><td colspan="${leadN}">합계</td>${D.colTot.map(v => `<td class="n">${fmtN(v)}</td>`).join('')}<td class="n">${fmtN(D.total)}</td><td class="n">${fmt1(D.total / avgDiv)}</td></tr>`;
+  return `<div class="panel">
+    <div class="filters"><label>연도</label>${fSel('mfY', years.map(y => [y, `${y}년`]), D.Y, `onchange="S.mf.year=this.value;render()"`)}
+      <label>기준</label>${fSel('mfBy', [['item', '품목별'], ['printer', '프린터 모델별'], ['dept', '수령부서별']], M.by, `onchange="S.mf.by=this.value;delete S.tsort['cons.monthly.0'];render()"`)}
+      <label>종류</label>${fSel('mfKind', [['', '전체'], ...CS_KINDS], M.kind, `onchange="S.mf.kind=this.value;render()"`)}
+      <label>단위</label>${fSel('mfUnit', [['qty', '수량(개)'], ['amount', '금액(원)']], M.unit, `onchange="S.mf.unit=this.value;render()"`)}
+      <div class="spacer"></div><button class="btn primary" onclick="exportMonthly()">📥 엑셀 내보내기</button></div>
+    <div class="kv"><span><b>${D.Y}년</b> 월별 불출 ${M.unit === 'amount' ? '금액(원, 수량 × 현재 단가)' : '수량(개)'}</span><span>합계 <b>${fmtN(D.total)}</b>${M.unit === 'amount' ? '원' : '개'}</span>
+      <span class="muted">월평균 = 합계 ÷ ${avgDiv}개월${D.Y === t.slice(0, 4) ? ` (올해는 ${D.lastMonth}월까지)` : ''}</span></div>
+    <div class="tablewrap"><table class="t"><thead><tr>${lead}${months.map(m => `<th class="n">${m}월</th>`).join('')}<th class="n">합계</th><th class="n">월평균</th></tr></thead>
+    <tbody>${D.rows.length ? body + foot : `<tr><td colspan="${leadN + 14}" class="empty">${D.Y}년 불출 기록이 없습니다.</td></tr>`}</tbody></table></div></div>`;
+}
+function exportMonthly() {
+  const M = S.mf, D = monthlyData();
+  const byLabel = { item: '품목별', printer: '프린터 모델별', dept: '수령부서별' }[M.by];
+  const lead = M.by === 'item' ? ['프린터 모델', '종류', '품명'] : [M.by === 'dept' ? '부서' : '프린터 모델'];
+  const ncol = lead.length + 14, last = colName(ncol - 1), avgDiv = Math.max(1, D.lastMonth);
+  const sh = { name: '월별 불출', cols: [...(M.by === 'item' ? [22, 10, 28] : [20]), ...Array(12).fill(M.unit === 'amount' ? 11 : 7), 11, 10], rows: [], merges: [`A1:${last}1`, `A2:${last}2`], freeze: 3, heights: { 0: 28 } };
+  sh.rows.push([{ v: `${D.Y}년 월별 소모품 불출 현황 (${byLabel}${M.kind ? ` · ${M.kind}` : ''})`, s: X.title }]);
+  sh.rows.push([{ v: `단위: ${M.unit === 'amount' ? '원 (불출 수량 × 현재 단가)' : '개'}    작성: ${fmtDT(new Date().toISOString())} ${WLABEL[worker]}    월평균 = 합계 ÷ ${avgDiv}개월`, s: X.info }]);
+  sh.rows.push([...lead, ...Array.from({ length: 12 }, (_, i) => `${i + 1}월`), '합계', '월평균'].map(v => ({ v, s: X.header })));
+  D.rows.forEach(r => sh.rows.push([...(M.by === 'item' ? [{ v: r.c.printerModel, s: X.cell }, { v: r.c.kind, s: X.center }, { v: r.c.name, s: X.cell }] : [{ v: r.key, s: X.cell }]),
+    ...r.m.map(v => ({ v, s: X.num })), { v: r.total, s: X.subNum }, { v: Math.round(r.total / avgDiv * 10) / 10, s: X.cell }]));
+  const rr = sh.rows.length + 1;
+  sh.rows.push([{ v: '합계', s: X.total }, ...Array(lead.length - 1).fill(0).map(() => ({ v: '', s: X.total })), ...D.colTot.map(v => ({ v, s: X.totalNum })), { v: D.total, s: X.totalNum }, { v: Math.round(D.total / avgDiv * 10) / 10, s: X.total }]);
+  if (lead.length > 1) sh.merges.push(`A${rr}:${colName(lead.length - 1)}${rr}`);
+  download(buildXlsx([sh]), `${D.Y}년_월별불출_${byLabel}_${stamp()}.xlsx`);
+  toast('월별 불출 현황 엑셀을 내려받았습니다.');
 }
 
 function renderCmp() {
