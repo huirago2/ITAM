@@ -70,6 +70,13 @@ table.t th{background:#f5f7fa;border-bottom:2px solid var(--line);padding:7px 8p
 table.t td{border-bottom:1px solid var(--line2);padding:6px 8px;vertical-align:middle}
 table.t tr:hover td{background:#fafbfd}
 table.t th.sortable{cursor:pointer;user-select:none}
+.col-resizer{position:absolute;top:0;right:0;width:7px;height:100%;cursor:col-resize;z-index:3;border-right:2px solid transparent}
+table.t th:hover .col-resizer{border-right-color:#c7d2e3}
+.col-resizer:hover,body.col-resizing .col-resizer:active{background:rgba(29,78,216,.28)}
+body.col-resizing{cursor:col-resize;user-select:none}
+body.col-resizing *{cursor:col-resize!important}
+table.t.fixedw{table-layout:fixed}
+table.t.fixedw th,table.t.fixedw td{overflow:hidden;overflow-wrap:anywhere}
 table.t th.sortable:hover{background:#e8eef8}
 .sarrow{margin-left:4px;font-size:10px;color:#b0b7c3}
 .sarrow.on{color:var(--primary);font-size:11px}
@@ -146,6 +153,7 @@ table.t input[type=number]{width:80px;padding:3px 6px;border:1px solid #c9d2e0;b
       <span id="dirtyBadge"></span>
       <button class="tbtn primary" onclick="saveFile()" title="현재 데이터를 JSON 파일로 저장">💾 저장</button>
       <button class="tbtn" onclick="loadClick()" title="데이터 파일(JSON) 불러오기">📂 불러오기</button>
+      <span id="colwReset"></span>
       <button class="tbtn" onclick="startEmpty()" title="샘플 없이 실제 데이터를 처음부터 입력">빈 데이터로 시작</button>
       <button class="tbtn" onclick="resetSample()">샘플 데이터 초기화</button>
       <input type="file" id="fileInput" accept=".json,application/json" style="display:none" onchange="loadFile(this)">
@@ -718,6 +726,7 @@ function renderTop() {
     ? `<span class="dirty" onclick="showChanges()" title="눌러서 저장 안 한 변경 내역 보기">● 저장 안 한 변경 있음 · 내역 보기 ▸</span>`
     : `<span class="saved" onclick="showChanges()" title="눌러서 변경 내역 보기">변경 없음</span>`;
   // datalists
+  document.getElementById('colwReset').innerHTML = Object.keys(COLW).length ? `<button class="tbtn" onclick="resetColWidths()" title="이 PC에서 끌어서 바꾼 열 너비를 모두 원래대로">열 너비 초기화</button>` : '';
   document.getElementById('dlDept').innerHTML = DB.settings.depts.slice().sort((a, b) => a.localeCompare(b, 'ko')).map(d => `<option value="${h(d)}">`).join('');
   const pos = new Set(POSITIONS); DB.loans.forEach(l => l.position && pos.add(l.position));
   document.getElementById('dlPos').innerHTML = [...pos].map(d => `<option value="${h(d)}">`).join('');
@@ -935,18 +944,69 @@ function domSort(tb, st) {
   rows.forEach(r => { if (r.classList.contains('sub') || r.classList.contains('total') || r.querySelector('td.empty')) { flush(); out.push(r); } else seg.push(r); });
   flush(); out.forEach(r => body.appendChild(r));
 }
+/* ---------- 열 너비 조절 (머리글 오른쪽 경계를 끌기) ----------
+   이 PC 브라우저에만 저장(데이터 파일·저장 안 한 변경과 무관). 표 키 + 머리글 이름으로 기억해 열이 늘어도 밀리지 않음.
+   경계를 더블클릭하면 그 열은 원래(자동) 너비로. */
+let COLW = {};
+try { COLW = JSON.parse(localStorage.getItem('rmh.colw') || '{}') || {}; } catch (e) { COLW = {}; }
+let _noSortUntil = 0; // 끌기 직후 머리글 클릭(정렬)이 함께 일어나지 않게
+function saveColW() { try { localStorage.setItem('rmh.colw', JSON.stringify(COLW)); } catch (e) { } }
+function fixTableWidths(tb, ths, saved) { // 자동 너비를 재서 고정 → 지정한 열만 바꿔도 나머지가 흔들리지 않음
+  const ws = ths.map(th => saved && saved[th.dataset.col] ? saved[th.dataset.col] : th.getBoundingClientRect().width);
+  ths.forEach((th, i) => th.style.width = ws[i] + 'px');
+  tb.style.width = ws.reduce((a, b) => a + b, 0) + 'px';
+  tb.classList.add('fixedw');
+}
 function enhanceTables(root) {
   root.querySelectorAll('table.t').forEach((tb, i) => {
     const key = tb.dataset.sort || tableKey(i), st = S.tsort[key];
-    [...tb.querySelectorAll('thead th')].forEach((th, ci) => {
-      if (!th.textContent.trim()) return;
+    const ths = [...tb.querySelectorAll('thead th')];
+    ths.forEach((th, ci) => {
+      const name = th.textContent.trim();
+      th.dataset.col = name || `#${ci}`;
+      const grip = document.createElement('span'); grip.className = 'col-resizer'; grip.title = '끌어서 열 너비 조절 · 더블클릭하면 원래 너비';
+      grip.addEventListener('click', e => e.stopPropagation());
+      grip.addEventListener('pointerdown', e => startColResize(e, tb, th, ths, key));
+      grip.addEventListener('dblclick', e => {
+        e.stopPropagation();
+        if (COLW[key]) { delete COLW[key][th.dataset.col]; if (!Object.keys(COLW[key]).length) delete COLW[key]; saveColW(); }
+        render();
+      });
+      if (!name) { th.appendChild(grip); return; }
       th.classList.add('sortable'); th.title = '누를 때마다 오름차순 → 내림차순 → 기본 순서';
       const on = st && st.col === ci;
       th.insertAdjacentHTML('beforeend', `<span class="sarrow${on ? ' on' : ''}">${on ? (st.dir > 0 ? '▲' : '▼') : '⇅'}</span>`);
-      th.onclick = () => toggleSort(key, ci);
+      th.appendChild(grip);
+      th.onclick = () => { if (Date.now() < _noSortUntil) return; toggleSort(key, ci); };
     });
+    if (COLW[key] && ths.some(th => COLW[key][th.dataset.col])) fixTableWidths(tb, ths, COLW[key]);
     if (!tb.dataset.sort && st) domSort(tb, st);
   });
+}
+function startColResize(e, tb, th, ths, key) {
+  if (e.button !== 0) return;
+  e.preventDefault(); e.stopPropagation();
+  if (!tb.classList.contains('fixedw')) fixTableWidths(tb, ths, COLW[key]);
+  const startX = e.clientX, startW = th.getBoundingClientRect().width, others = ths.reduce((a, x) => a + (x === th ? 0 : x.getBoundingClientRect().width), 0);
+  let moved = false, w = startW;
+  document.body.classList.add('col-resizing');
+  const move = ev => {
+    const dx = ev.clientX - startX; if (Math.abs(dx) > 2) moved = true;
+    w = Math.max(40, Math.round(startW + dx));
+    th.style.width = w + 'px'; tb.style.width = (others + w) + 'px';
+  };
+  const up = () => {
+    document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up);
+    document.body.classList.remove('col-resizing');
+    _noSortUntil = Date.now() + 300;
+    if (!moved) return;
+    COLW[key] = COLW[key] || {}; COLW[key][th.dataset.col] = w; saveColW();
+  };
+  document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+}
+function resetColWidths() {
+  if (!confirm('이 PC에서 조절한 모든 표의 열 너비를 원래대로 되돌릴까요?')) return;
+  COLW = {}; saveColW(); render(); toast('열 너비를 원래대로 되돌렸습니다.');
 }
 function toggleSort(key, col) {
   const s = S.tsort[key];
