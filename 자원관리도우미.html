@@ -355,6 +355,21 @@ function resetSample() {
   DB = makeSample(); loadedName = null; dirty = false; persist(); setBaseline(); S.screen = 'home'; S.tsort = {}; render();
   toast('샘플 데이터로 초기화했습니다.');
 }
+function fillSampleSerials(d) { // 샘플 데이터 전용: 비어 있는 S/N을 자산번호로 정해지는 가상값으로 채움
+  const CH = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789';
+  const PRE = { LG: 'LG', 삼성: 'SS', HP: 'HP', 레노버: 'LN', 델: 'DL', 캐논: 'CN', Epson: 'EP', 신도리코: 'SD' };
+  const mm = {}; d.models.forEach(m => mm[m.id] = m);
+  let n = 0;
+  d.equipment.forEach(e => {
+    if (e.serial) return;
+    const m = mm[e.modelId]; if (!m) return;
+    let x = 0; for (const ch of e.assetNo + m.id) x = (Math.imul(x, 31) + ch.charCodeAt(0)) >>> 0;
+    const rnd = mulberry32(x);
+    e.serial = (PRE[m.name.split(' ')[0]] || 'XX') + m.introDate.slice(2, 4) + Array.from({ length: 6 }, () => CH[Math.floor(rnd() * CH.length)]).join('');
+    n++;
+  });
+  return n;
+}
 function emptyData(depts, parents = {}) {
   return normalize({
     version: APP_VERSION, models: [], equipment: [], loans: [], consumables: [], stockLogs: [], wasteLogs: [],
@@ -2478,6 +2493,8 @@ function zipStore(files, mime) {
     if (restored && b && b.data && Array.isArray(b.data.models)) { BASE = normalize(b.data); BASE_MODE = b.mode || 'file'; }
   } catch (e) { }
   if (!BASE) setBaseline(restored && dirty ? 'unknown' : 'file');
+  // S/N 항목이 생기기 전에 만든 샘플 데이터면 가상 S/N을 채움 (저장 안 한 변경으로 치지 않음)
+  if (DB.settings.dataKind === 'sample' && fillSampleSerials(DB)) { if (BASE && BASE.settings && BASE.settings.dataKind === 'sample') fillSampleSerials(BASE); persist(); try { localStorage.setItem('rmh.base', JSON.stringify({ data: BASE, mode: BASE_MODE })); } catch (e) { } }
   render();
   if (restored) toast(dirty ? '이전 작업 상태를 복원했습니다. (파일로 저장하지 않은 변경 있음)' : '이전 작업 상태를 복원했습니다.');
 })();
