@@ -87,6 +87,10 @@ table.t input[type=number]{width:80px;padding:3px 6px;border:1px solid #c9d2e0;b
 .b-gray{background:#e5e7eb;color:#4b5563}
 .b-red{background:var(--red-bg);color:var(--red)}
 .b-orange{background:var(--orange-bg);color:var(--orange)}
+.b-yellow{background:#fef9c3;color:#854d0e}
+.card.yellow .v{color:#a16207}
+.alert.yellow{background:#fefce8;color:#713f12}
+.alert.yellow .tag{background:#ca8a04}
 .txt-red{color:var(--red);font-weight:700}
 .txt-orange{color:var(--orange);font-weight:700}
 .muted{color:var(--muted);font-size:12px}
@@ -162,6 +166,7 @@ table.t input[type=number]{width:80px;padding:3px 6px;border:1px solid #c9d2e0;b
 <datalist id="dlDept"></datalist>
 <datalist id="dlPos"></datalist>
 <div id="toast"></div>
+<input type="file" id="xlsxInput" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none" onchange="importEquipFile(this)">
 
 <script>
 'use strict';
@@ -170,10 +175,10 @@ table.t input[type=number]{width:80px;padding:3px 6px;border:1px solid #c9d2e0;b
    ===================================================================== */
 const APP_VERSION = 1;
 const TYPES = ['노트북', 'PC', '모니터', '프린터'];
-const USAGES = ['대여용', '설치'];
+const USAGES = ['대여용', '설치', '재활용']; // 재활용은 설치 장비와 같은 방식으로 관리·표시
 const EQ_STATUS = ['사용 중', '대여 가능', '대여 중', '불용처리'];
 const CS_KINDS = ['잉크', '토너', '헤드', '유지보수키트'];
-const LIFE_ST = ['정상', '구매 소요 확정 대상', '불용 대상'];
+const LIFE_ST = ['정상', '사전 검토 대상', '구매 소요 확정 대상', '불용 대상'];
 const WLABEL = { 정: '정 담당자', 부: '부 담당자' };
 const DEPTS = ['행정과', '기획예산과', '민원과', '총무과', '재무과', '감사실', '정보통신과', '시설관리과', '복지정책과', '교육지원과', '안전관리과', '홍보담당관'];
 const SAMPLE_PARENTS = { // 샘플용 가상 상위부서
@@ -248,7 +253,7 @@ const S = {
   af: { q: '', type: '', usage: '', status: '', life: '' }, aPage: 0,
   tsort: {}, // 표 정렬 상태: 표 키 → { col, dir }
   wf: { year: '', kind: '' }, wPage: 0,
-  hf: { asset: '', dept: '', status: '' },
+  hf: Object.assign({ asset: '', dept: '', status: '' }, histPeriod('year1')),
   csTab: 'stock', lf: { kind: '', cid: '', year: '' }, lPage: 0,
   cmpYear: null, pq: null,
   rp: null, highlight: null,
@@ -263,13 +268,17 @@ function lifeStatus(m, base) {
   const ex = expiry(m);
   if (base > ex) return '불용 대상';
   if (ex <= addYears(base, 1)) return '구매 소요 확정 대상';
+  if (ex <= addYears(base, 2)) return '사전 검토 대상'; // 만료 1~2년 전: 예산·교체 계획 미리 검토
   return '정상';
 }
 function lifeBadge(st) {
   return st === '불용 대상' ? `<span class="badge b-red">불용 대상</span>`
     : st === '구매 소요 확정 대상' ? `<span class="badge b-orange">구매 소요 확정 대상</span>`
-      : `<span class="badge b-green">정상</span>`;
+      : st === '사전 검토 대상' ? `<span class="badge b-yellow">사전 검토 대상</span>`
+        : `<span class="badge b-green">정상</span>`;
 }
+const lifeX = st => st === '불용 대상' ? X.red : st === '구매 소요 확정 대상' ? X.orange : st === '사전 검토 대상' ? X.yellow : X.center;
+const isRental = m => m && m.usage === '대여용'; // 설치·재활용은 같은 방식으로 다룸
 function eqBadge(st) {
   const c = { '사용 중': 'b-blue', '대여 가능': 'b-green', '대여 중': 'b-orange', '불용처리': 'b-gray' }[st] || 'b-gray';
   return `<span class="badge ${c}">${h(st)}</span>`;
@@ -524,6 +533,9 @@ function makeSample() {
   M('프린터', '설치', '캐논 iR-ADV DX C3826', '복합기 교체사업', { ago: 22 }, 6, 30);
   M('프린터', '설치', 'Epson L15160', '잉크젯 복합기 도입사업', { ago: 36 }, 6, 20);
   M('프린터', '설치', '신도리코 D420', '복합기 도입사업', { exp: -30 }, 6, 15);
+  // ---- 재활용 (반납 장비를 정비해 재배치, 설치 장비와 같은 방식) ----
+  M('PC', '재활용', 'HP ProDesk 400 G7', '반납 PC 재배치', { ago: 50 }, 6, 12);
+  M('모니터', '재활용', 'LG 24MK600M', '반납 모니터 재배치', { exp: 500 }, 7, 18);
 
   // ---- 대여 기록 ----
   const mOf = e => models.find(m => m.id === e.modelId);
@@ -910,6 +922,7 @@ function renderHome() {
   const mrows = DB.models.map(m => ({ m, ex: expiry(m), st: lifeStatus(m, t), n: DB.equipment.filter(e => e.modelId === m.id && e.status !== '불용처리').length })).filter(r => r.n > 0);
   const buy = mrows.filter(r => r.st === '구매 소요 확정 대상').sort((a, b) => cmp(a.ex, b.ex));
   const disp = mrows.filter(r => r.st === '불용 대상').sort((a, b) => cmp(a.ex, b.ex));
+  const pre = mrows.filter(r => r.st === '사전 검토 대상').sort((a, b) => cmp(a.ex, b.ex));
   const exp = DB.settings.reportExports[`${Y}-${Q}`];
   const rentalEq = DB.equipment.filter(e => MM[e.modelId].usage === '대여용');
   const availN = rentalEq.filter(e => e.status === '대여 가능').length;
@@ -953,6 +966,7 @@ function renderHome() {
     <div class="card green"><div class="k">지금 대여 가능</div><div class="v">${availN}대</div></div>
     <div class="card orange"><div class="k">구매 소요 확정 대상</div><div class="v">${buy.reduce((s, r) => s + r.n, 0)}대</div><div class="muted">${buy.length}개 모델</div></div>
     <div class="card red"><div class="k">불용 대상 (미처리)</div><div class="v">${disp.reduce((s, r) => s + r.n, 0)}대</div><div class="muted">${disp.length}개 모델</div></div>
+    <div class="card yellow"><div class="k">사전 검토 대상 (만료 1~2년 전)</div><div class="v">${pre.reduce((s, r) => s + r.n, 0)}대</div><div class="muted">${pre.length}개 모델</div></div>
   </div>
   <div class="grid g2">
     <div class="panel"><h3>🔴 반납 기한 초과</h3>${overdue.map(l => loanLine(l, 'red', '기한 초과')).join('') || '<div class="empty">기한이 지난 대여가 없습니다.</div>'}
@@ -960,6 +974,8 @@ function renderHome() {
     <div class="panel"><h3>🟠 구매 소요 확정 대상 <span class="muted">사용연한 만료 1년 이내 — 교체 장비 구매 소요 확정 필요</span></h3>${buy.map(r => modelLine(r, 'orange', '구매 소요')).join('') || '<div class="empty">해당 장비가 없습니다.</div>'}
       <h3 style="margin-top:16px">🔴 불용 대상 <span class="muted">사용연한 경과 — 불용처리 필요 (미처리 대수)</span></h3>${disp.map(r => modelLine(r, 'red', '불용 대상')).join('') || '<div class="empty">해당 장비가 없습니다.</div>'}</div>
   </div>
+  <div class="panel"><h3>🟡 사전 검토 대상 <span class="muted">사용연한 만료 1~2년 전 — 내년 구매 소요 확정 전에 예산·교체 계획을 미리 검토</span></h3>
+    ${pre.map(r => modelLine(r, 'yellow', '사전 검토')).join('') || '<div class="empty">해당 장비가 없습니다.</div>'}</div>
   <div class="panel"><h3>대여 가능 대수 요약 <button class="btn sm" style="margin-left:8px" onclick="S.eqTab='rental';go('equip')">장비·대여 화면으로</button></h3>
     <div class="chips">${availByModel.map(r => `<div class="chip ${r.n ? '' : 'zero'}"><span class="tp">${h(r.m.type)}</span>${h(r.m.name)} &nbsp;<b>${r.n}</b>대 <span class="muted">(대여 중 ${r.on})</span></div>`).join('')}</div>
   </div>`;
@@ -1001,7 +1017,7 @@ function renderRental() {
       <td>${lifeBadge(lifeStatus(m, t))}</td>
       <td>${e.status === '대여 가능' ? `<button class="btn sm primary" onclick="loanModal(${ja(e.assetNo)})">대여</button>` : ''}
           ${l ? `<button class="btn sm primary" onclick="returnModal(${ja(l.id)})">반납</button>` : ''}
-          <button class="btn sm" onclick="S.hf.asset=${ja(e.assetNo)};S.eqTab='history';render()">이력</button>
+          <button class="btn sm" onclick="S.hf.asset=${ja(e.assetNo)};Object.assign(S.hf,histPeriod('all'));S.eqTab='history';render()" title="이 장비의 전체 기간 대여 이력">이력</button>
           <button class="btn sm" onclick="editEquipModal(${ja(e.assetNo)})">수정</button></td></tr>`;
   }).join('');
   return `
@@ -1089,11 +1105,23 @@ function returnModal(id) {
     }, '반납 처리');
 }
 
+function histPeriod(kind) { // 대여 이력 조회기간(월 단위, 대여일 기준)
+  const t = TODAY(), Y = +t.slice(0, 4);
+  if (kind === 'year1') return { from: addMonths(t, -11).slice(0, 7), to: t.slice(0, 7) }; // 이번 달 포함 최근 12개월
+  if (kind === 'thisYear') return { from: `${Y}-01`, to: `${Y}-12` };
+  if (kind === 'lastYear') return { from: `${Y - 1}-01`, to: `${Y - 1}-12` };
+  return { from: '', to: '' }; // 전체
+}
+function setHistPeriod(kind) { Object.assign(S.hf, histPeriod(kind)); render(); }
 function renderHistory() {
   const t = TODAY();
   const q = S.hf.asset.trim().toLowerCase();
+  if (S.hf.from && S.hf.to && S.hf.from > S.hf.to) [S.hf.from, S.hf.to] = [S.hf.to, S.hf.from];
   const eqOf = a => DB.equipment.find(e => e.assetNo === a);
   let list = DB.loans.filter(l => {
+    const lm = l.loanDate.slice(0, 7);
+    if (S.hf.from && lm < S.hf.from) return false;
+    if (S.hf.to && lm > S.hf.to) return false;
     if (S.hf.dept && l.dept !== S.hf.dept) return false;
     if (S.hf.status === 'active' && l.returnDate) return false;
     if (S.hf.status === 'done' && !l.returnDate) return false;
@@ -1117,8 +1145,13 @@ function renderHistory() {
     <div class="filters"><label>장비·모델·공문번호</label><input id="hfAsset" value="${h(S.hf.asset)}" placeholder="자산번호/모델명/공문번호" oninput="S.hf.asset=this.value;render()">
       <label>부서</label>${fSel('hfDept', [['', '전체'], ...depts], S.hf.dept, `onchange="S.hf.dept=this.value;render()"`)}
       <label>상태</label>${fSel('hfStatus', [['', '전체'], ['active', '대여 중'], ['done', '반납 완료']], S.hf.status, `onchange="S.hf.status=this.value;render()"`)}
-      <button class="btn sm" onclick="S.hf={asset:'',dept:'',status:''};render()">필터 초기화</button>
+      <button class="btn sm" onclick="S.hf=Object.assign({asset:'',dept:'',status:''},histPeriod('year1'));render()">필터 초기화</button>
       <span class="muted">${list.length}건</span></div>
+    <div class="filters"><label>조회기간 (대여일 기준)</label>
+      <input type="month" id="hfFrom" value="${h(S.hf.from)}" onchange="S.hf.from=this.value;render()"> ~
+      <input type="month" id="hfTo" value="${h(S.hf.to)}" onchange="S.hf.to=this.value;render()">
+      ${[['year1', '최근 1년'], ['thisYear', '올해'], ['lastYear', '작년'], ['all', '전체']].map(([k, l]) => { const p = histPeriod(k); const on = p.from === S.hf.from && p.to === S.hf.to; return `<button class="btn sm${on ? ' primary' : ''}" onclick="setHistPeriod('${k}')">${l}</button>`; }).join('')}
+      <span class="muted">${S.hf.from || S.hf.to ? `${S.hf.from || '처음'} ~ ${S.hf.to || '현재'} 에 대여한 기록` : '전체 기간'} · 기본값은 이번 달을 포함한 최근 12개월</span></div>
     <div class="grid" style="grid-template-columns:1fr 240px">
       <div class="tablewrap"><table class="t"><thead><tr><th>대여일</th><th>자산번호</th><th>모델</th><th>대여 부서</th><th>직책</th><th>공문번호</th><th>반납예정일</th><th>실제 반납일</th><th class="n">기간</th><th class="c">대여 확인</th><th class="c">반납 확인</th><th>상태</th></tr></thead>
       <tbody>${rows || '<tr><td colspan="12" class="empty">기록이 없습니다.</td></tr>'}</tbody></table></div>
@@ -1155,7 +1188,7 @@ function renderAllEquip() {
       <label>사용연한</label>${fSel('afLife', [['', '전체'], ...LIFE_ST], f.life, `onchange="S.af.life=this.value;S.aPage=0;render()"`)}
       <span class="muted">${fmtN(list.length)}대</span><div class="spacer"></div>
       ${list.some(e => e.status !== '불용처리' && lifeStatus(MM[e.modelId], t) === '불용 대상') && f.life === '불용 대상' ? `<button class="btn danger" onclick="bulkDispose()">목록의 불용 대상 일괄 불용처리</button>` : ''}
-      <button class="btn primary" onclick="addEquipModal()">+ 장비 추가</button></div>
+      <button class="btn" onclick="downloadEquipTemplate()" title="엑셀로 여러 대를 한 번에 등록할 때 쓰는 양식">📄 기본 양식 내려받기</button><button class="btn" onclick="equipImportClick()" title="작성한 양식(.xlsx)을 첨부해 장비 등록">📎 엑셀 첨부</button><button class="btn primary" onclick="addEquipModal()">+ 장비 추가</button></div>
     <div class="tablewrap"><table class="t" data-sort="eqAll"><thead><tr><th>자산번호</th><th>종류</th><th>구분</th><th>모델명</th><th>도입사업명</th><th>도입일</th><th>만료일</th><th>사용연한</th><th>상태</th><th>위치·사용부서</th><th>사용자 직책</th><th>비고</th><th></th></tr></thead>
     <tbody>${rows || '<tr><td colspan="13" class="empty">해당 장비가 없습니다.</td></tr>'}</tbody></table></div>
     <div class="pager"><button class="btn sm" ${S.aPage <= 0 ? 'disabled' : ''} onclick="S.aPage--;render()">◀ 이전</button> ${S.aPage + 1} / ${pages} 페이지 <button class="btn sm" ${S.aPage >= pages - 1 ? 'disabled' : ''} onclick="S.aPage++;render()">다음 ▶</button></div>
@@ -1182,7 +1215,7 @@ function editEquipModal(assetNo) {
     `<div class="kv"><span><b>${h(modelLabel(m))}</b></span><span>${h(m.usage)}</span><span>만료일 <b>${expiry(m)}</b></span></div>` +
     fRow('모델', fSel('eModel', DB.models.filter(x => x.type === m.type).map(x => [x.id, `${x.name} · ${x.project} (${x.usage})`]), e.modelId)) +
     fRow('위치·사용부서', fIn('eLoc', e.location, 'text', 'list="dlDept"')) +
-    (m.usage === '설치' ? fRow('사용자 직책', fIn('ePos', e.position, 'text', 'list="dlPos"')) : '') +
+    (!isRental(m) ? fRow('사용자 직책', fIn('ePos', e.position, 'text', 'list="dlPos"')) : '') +
     fRow('상태', fSel('eSt', stOpts, e.status)) +
     (loaning ? '<div class="hint">대여 중인 장비는 반납 처리 후 상태를 바꿀 수 있습니다.</div>' : '') +
     fRow('비고', fIn('eNote', e.note)),
@@ -1191,7 +1224,7 @@ function editEquipModal(assetNo) {
       e.status = gv('eSt'); e.note = gv('eNote');
       const nm = MM[e.modelId];
       if (nm.usage === '대여용' && e.status === '사용 중') e.status = '대여 가능';
-      if (nm.usage === '설치' && e.status === '대여 가능') e.status = '사용 중';
+      if (!isRental(nm) && e.status === '대여 가능') e.status = '사용 중';
       changed('장비 정보를 저장했습니다.');
     }, '저장',
     loaning ? [] : [{
@@ -1210,7 +1243,7 @@ function addEquipModal(modelId) {
     fRow('추가 대수', fIn('aCnt', 1, 'number', 'min="1" max="500"'), true) +
     fRow('자산번호', fIn('aAsset', '', 'text', 'placeholder="비워두면 자동 생성 (1대일 때만 직접 입력)"')) +
     fRow('위치·사용부서', fIn('aLoc', '', 'text', 'list="dlDept" placeholder="대여용은 비워두면 대여 보관"')) +
-    fRow('사용자 직책', fIn('aPos', '', 'text', 'list="dlPos" placeholder="설치 장비만"')) +
+    fRow('사용자 직책', fIn('aPos', '', 'text', 'list="dlPos" placeholder="설치·재활용 장비만"')) +
     fRow('비고', fIn('aNote', '')),
     () => {
       const m = MM[gv('aModel')], n = parseInt(gv('aCnt'), 10);
@@ -1223,7 +1256,7 @@ function addEquipModal(modelId) {
       let maxSeq = 0; DB.equipment.forEach(e => { const mm = /^([A-Z]+)\d{2}-(\d+)$/.exec(e.assetNo); if (mm && mm[1] === PFX) maxSeq = Math.max(maxSeq, +mm[2]); });
       for (let i = 0; i < n; i++) {
         const assetNo = manual || `${PFX}${m.introDate.slice(2, 4)}-${String(++maxSeq).padStart(4, '0')}`;
-        DB.equipment.push({ assetNo, modelId: m.id, location: gv('aLoc') || (m.usage === '대여용' ? RENTAL_LOC : ''), position: m.usage === '설치' ? gv('aPos') : '', status: m.usage === '대여용' ? '대여 가능' : '사용 중', note: gv('aNote') });
+        DB.equipment.push({ assetNo, modelId: m.id, location: gv('aLoc') || (m.usage === '대여용' ? RENTAL_LOC : ''), position: !isRental(m) ? gv('aPos') : '', status: isRental(m) ? '대여 가능' : '사용 중', note: gv('aNote') });
       }
       changed(`${n}대를 추가했습니다.`);
     }, '추가');
@@ -1239,7 +1272,7 @@ function renderModels() {
       <td class="n">${c.live}</td><td class="n">${c.disp}</td>
       <td><button class="btn sm" onclick="modelModal(${ja(m.id)})">수정</button> <button class="btn sm" onclick="addEquipModal(${ja(m.id)})">장비 추가</button></td></tr>`;
   }).join('');
-  return `<div class="panel"><div class="filters"><span class="muted">같은 사업으로 들어온 같은 모델은 하나의 장비모델(도입 묶음)로 관리합니다. 사용연한은 장비모델 단위로 판정합니다.</span><div class="spacer"></div><button class="btn primary" onclick="modelModal()">+ 장비모델 추가</button></div>
+  return `<div class="panel"><div class="filters"><span class="muted">같은 사업으로 들어온 같은 모델은 하나의 장비모델(도입 묶음)로 관리합니다. 사용연한은 장비모델 단위로 판정합니다.</span><div class="spacer"></div><button class="btn" onclick="downloadEquipTemplate()">📄 기본 양식 내려받기</button><button class="btn" onclick="equipImportClick()">📎 엑셀 첨부</button><button class="btn primary" onclick="modelModal()">+ 장비모델 추가</button></div>
   <div class="tablewrap"><table class="t"><thead><tr><th>구분</th><th>종류</th><th>모델명</th><th>도입사업명</th><th>도입일</th><th class="n">사용연한</th><th>만료일</th><th>상태(오늘 기준)</th><th class="n">운영 대수</th><th class="n">불용처리</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 function modelModal(id) {
@@ -1257,7 +1290,7 @@ function modelModal(id) {
       if (m) {
         if (m.usage !== v.usage) DB.equipment.filter(e => e.modelId === m.id).forEach(e => {
           if (v.usage === '대여용' && e.status === '사용 중') e.status = '대여 가능';
-          if (v.usage === '설치' && e.status === '대여 가능') e.status = '사용 중';
+          if (v.usage !== '대여용' && e.status === '대여 가능') e.status = '사용 중';
         });
         Object.assign(m, v);
       } else DB.models.push(Object.assign({ id: uid('M') }, v));
@@ -1280,7 +1313,7 @@ function reportData() {
   const R = S.rp, base = qEnd(R.y, R.q);
   const all = DB.equipment.filter(e => MM[e.modelId].introDate <= base && (R.incDisposed || e.status !== '불용처리'))
     .map(e => { const m = MM[e.modelId]; return { e, m, ex: expiry(m), st: lifeStatus(m, base) }; });
-  const counts = { 정상: 0, '구매 소요 확정 대상': 0, '불용 대상': 0 }; all.forEach(r => counts[r.st]++);
+  const counts = { 정상: 0, '사전 검토 대상': 0, '구매 소요 확정 대상': 0, '불용 대상': 0 }; all.forEach(r => counts[r.st]++);
   const rows = all.filter(r => (!R.type || r.m.type === R.type) && (!R.status || r.st === R.status)).sort((a, b) => sortEquip(a.e, b.e));
   // 총괄: 모델 단위
   const groups = [];
@@ -1320,14 +1353,14 @@ function renderReport() {
     <div class="filters">
       <label>연도</label>${fSel('rpY', yOpts, R.y, `onchange="S.rp.y=+this.value;render()"`)}
       <label>분기</label>${fSel('rpQ', [[1, '1분기'], [2, '2분기'], [3, '3분기'], [4, '4분기']], R.q, `onchange="S.rp.q=+this.value;render()"`)}
-      <label>상태</label>${fSel('rpSt', [['', '전체'], '구매 소요 확정 대상', '불용 대상', '정상'], R.status, `onchange="S.rp.status=this.value;render()"`)}
+      <label>상태</label>${fSel('rpSt', [['', '전체'], '구매 소요 확정 대상', '불용 대상', '사전 검토 대상', '정상'], R.status, `onchange="S.rp.status=this.value;render()"`)}
       <label>장비종류</label>${fSel('rpType', [['', '전체'], ...TYPES], R.type, `onchange="S.rp.type=this.value;render()"`)}
       <label><input type="checkbox" ${R.incDisposed ? 'checked' : ''} onchange="S.rp.incDisposed=this.checked;render()"> 불용처리 완료 장비 포함</label>
       <div class="spacer"></div>
       <button class="btn primary" onclick="exportReport()">📥 엑셀 내보내기 (총괄+세부)</button>
     </div>
     <div class="kv"><span>보고: <b>${R.y}년 ${R.q}분기 전산장비 현황</b></span><span>기준일 <b>${D.base}</b></span>
-      <span>정상 <b>${fmtN(D.counts['정상'])}</b>대</span><span class="txt-orange">구매 소요 확정 대상 ${fmtN(D.counts['구매 소요 확정 대상'])}대</span><span class="txt-red">불용 대상 ${fmtN(D.counts['불용 대상'])}대</span>
+      <span>정상 <b>${fmtN(D.counts['정상'])}</b>대</span><span class="txt-orange">구매 소요 확정 대상 ${fmtN(D.counts['구매 소요 확정 대상'])}대</span><span class="txt-red">불용 대상 ${fmtN(D.counts['불용 대상'])}대</span><span style="color:#a16207;font-weight:700">사전 검토 대상 ${fmtN(D.counts['사전 검토 대상'])}대</span>
       <span class="muted">${exp ? `이 분기 마지막 내보내기: ${fmtDT(exp)}` : '이 분기는 아직 내보내지 않음'}</span></div>
     <div class="subtabs"><button class="${R.view === 'summary' ? 'on' : ''}" onclick="S.rp.view='summary';render()">총괄현황 (모델 단위)</button><button class="${R.view === 'detail' ? 'on' : ''}" onclick="S.rp.view='detail';render()">세부현황 (${fmtN(D.total)}대)</button></div>
     ${table}
@@ -1338,7 +1371,7 @@ function exportReport() {
   const title = `${R.y}년 ${R.q}분기 전산장비 현황`;
   const filt = [R.status ? `상태: ${R.status}` : '상태: 전체', R.type ? `장비종류: ${R.type}` : '장비종류: 전체', R.incDisposed ? '불용처리 완료 포함' : '불용처리 완료 제외'].join(' / ');
   const info = `기준일: ${D.base}    작성: ${fmtDT(new Date().toISOString())} ${WLABEL[worker]}    (${filt})`;
-  const stS = st => st === '불용 대상' ? X.red : st === '구매 소요 확정 대상' ? X.orange : X.center;
+  const stS = lifeX;
   // 총괄
   const sh1 = { name: '총괄현황', cols: [10, 26, 8, 30, 12, 9, 12, 9, 20], rows: [], merges: ['A1:I1', 'A2:I2'], freeze: 3, heights: { 0: 28 } };
   sh1.rows.push([{ v: title, s: X.title }]);
@@ -1353,11 +1386,11 @@ function exportReport() {
   const tr = sh1.rows.length + 1;
   sh1.rows.push([{ v: '합계', s: X.total }, { v: '', s: X.total }, { v: '', s: X.total }, { v: '', s: X.total }, { v: '', s: X.total }, { v: '', s: X.total }, { v: '', s: X.total }, { v: D.total, s: X.totalNum }, { v: '', s: X.total }]);
   sh1.merges.push(`A${tr}:G${tr}`);
-  const cnt = { 정상: 0, '구매 소요 확정 대상': 0, '불용 대상': 0 }; D.rows.forEach(r => cnt[r.st]++);
+  const cnt = { 정상: 0, '사전 검토 대상': 0, '구매 소요 확정 대상': 0, '불용 대상': 0 }; D.rows.forEach(r => cnt[r.st]++);
   sh1.rows.push([]);
   sh1.rows.push([{ v: '상태별 합계', s: X.bold }]);
-  ['구매 소요 확정 대상', '불용 대상', '정상'].forEach(st => sh1.rows.push([{ v: st, s: stS(st) }, { v: cnt[st], s: X.num }]));
-  sh1.rows.push([{ v: '※ 구매 소요 확정 대상: 기준일 ≤ 만료일 ≤ 기준일+1년 / 불용 대상: 기준일 > 만료일 / 만료일 = 도입일 + 사용연한', s: X.info }]);
+  ['구매 소요 확정 대상', '불용 대상', '사전 검토 대상', '정상'].forEach(st => sh1.rows.push([{ v: st, s: stS(st) }, { v: cnt[st], s: X.num }]));
+  sh1.rows.push([{ v: '※ 불용 대상: 기준일 > 만료일 / 구매 소요 확정 대상: 만료일 ≤ 기준일+1년 / 사전 검토 대상: 기준일+1년 < 만료일 ≤ 기준일+2년 / 만료일 = 도입일 + 사용연한', s: X.info }]);
   // 세부
   const sh2 = { name: '세부현황', cols: [10, 26, 13, 30, 12, 9, 12, 20, 26, 12], rows: [], merges: ['A1:J1', 'A2:J2'], freeze: 3, heights: { 0: 28 } };
   sh2.rows.push([{ v: title + ' (세부)', s: X.title }]);
@@ -1856,6 +1889,160 @@ function exportPlan() {
   toast('구매 소요표 엑셀을 내려받았습니다.');
 }
 
+/* ---------- 엑셀로 장비 추가 (양식 내려받기 / 첨부) ---------- */
+const IMPORT_COLS = [ // [머리글, 키, 필수, 열 너비]
+  ['장비종류', 'type', true, 10], ['구분', 'usage', true, 9], ['모델명', 'name', true, 26], ['도입사업명', 'project', false, 28],
+  ['도입일', 'introDate', true, 12], ['사용연한(년)', 'life', true, 11], ['자산번호', 'assetNo', false, 14],
+  ['위치·사용부서', 'location', false, 16], ['사용자 직책', 'position', false, 11], ['상태', 'status', false, 10], ['비고', 'note', false, 24],
+];
+function downloadEquipTemplate() {
+  const head = IMPORT_COLS.map(c => ({ v: c[0] + (c[2] ? '*' : ''), s: X.header }));
+  const sh1 = { name: '장비등록', cols: IMPORT_COLS.map(c => c[3]), rows: [head], freeze: 1,
+    validations: [{ sqref: 'A2:A5000', list: TYPES }, { sqref: 'B2:B5000', list: USAGES }, { sqref: 'J2:J5000', list: ['사용 중', '대여 가능', '불용처리'] }] };
+  const g = (v, s = X.cell) => ({ v, s });
+  const sh2 = { name: '작성 안내', cols: [18, 70], rows: [], merges: ['A1:B1'], heights: { 0: 28 } };
+  sh2.rows.push([{ v: '장비 등록 양식 작성 안내', s: X.title }], []);
+  [['작성 위치', '"장비등록" 시트의 2행부터 한 줄에 장비 1대씩 입력합니다. 머리글(1행)은 바꾸지 마세요.'],
+   ['장비종류 *', TYPES.join(' / ')],
+   ['구분 *', '대여용 / 설치 / 재활용 (재활용은 설치 장비와 같은 방식으로 관리)'],
+   ['모델명 *', '예: LG 그램 16Z90R'],
+   ['도입사업명', '예: 2026년 노트북 교체사업'],
+   ['도입일 *', '날짜 (예: 2026-03-15). 2026.03.15, 2026/3/15 형식도 됩니다.'],
+   ['사용연한(년) *', '숫자 (예: 5)'],
+   ['자산번호', '비워두면 자동으로 매깁니다(예: NB26-0001). 이미 있는 자산번호는 등록되지 않습니다.'],
+   ['위치·사용부서', '설치·재활용 장비의 부서. 대여용은 비우면 "' + RENTAL_LOC + '"'],
+   ['사용자 직책', '설치·재활용 장비만 (예: 주무관). 이름은 적지 않습니다.'],
+   ['상태', '비우면 대여용은 "대여 가능", 설치·재활용은 "사용 중". "불용처리"도 입력 가능'],
+   ['장비모델(도입 묶음)', '장비종류·구분·모델명·도입사업명·도입일·사용연한이 모두 같은 행은 하나의 장비모델로 묶입니다. 도구에 같은 장비모델이 이미 있으면 그 모델에 추가되고, 없으면 새로 만들어집니다. 기존 모델에 추가하려면 "기존 장비모델" 시트의 값을 그대로 복사해 쓰세요.']]
+    .forEach(([a, b]) => sh2.rows.push([g(a, X.sub), g(b)]));
+  sh2.rows.push([], [{ v: '입력 예시', s: X.bold }], IMPORT_COLS.map(c => ({ v: c[0], s: X.header })));
+  sh2.rows.push(['노트북', '대여용', 'LG 그램 16Z90R', '2026년 노트북 교체사업', '2026-03-15', 5, '', '', '', '', ''].map(v => g(v)));
+  sh2.rows.push(['PC', '설치', '삼성 DM500TFA', '2026년 행정 PC 교체사업', '2026-04-01', 6, 'PC26-0101', '행정과', '주무관', '', ''].map(v => g(v)));
+  sh2.cols = [18, 70, 26, 28, 12, 11, 14, 16, 11, 10, 24];
+  const sh3 = { name: '기존 장비모델', cols: [10, 9, 28, 30, 12, 11, 10], rows: [], freeze: 1 };
+  sh3.rows.push(['장비종류', '구분', '모델명', '도입사업명', '도입일', '사용연한(년)', '현재 대수'].map(v => ({ v, s: X.header })));
+  DB.models.slice().sort((a, b) => cmp(a.usage, b.usage) || TYPES.indexOf(a.type) - TYPES.indexOf(b.type) || cmp(a.introDate, b.introDate)).forEach(m =>
+    sh3.rows.push([g(m.type, X.center), g(m.usage, X.center), g(m.name), g(m.project), g(m.introDate, X.center), { v: Number(m.life), s: X.num }, { v: DB.equipment.filter(e => e.modelId === m.id).length, s: X.num }]));
+  download(buildXlsx([sh1, sh2, sh3]), `장비등록_양식.xlsx`);
+  toast('장비 등록 양식을 내려받았습니다. 작성 후 [엑셀 첨부]로 올려 주세요.');
+}
+function equipImportClick() { document.getElementById('xlsxInput').click(); }
+async function readXlsx(buf) { // 압축 해제(DecompressionStream) 후 시트를 2차원 배열로
+  const dv = new DataView(buf), dec = new TextDecoder();
+  let eocd = -1;
+  for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new Error('엑셀(.xlsx) 파일이 아닙니다. 예전 형식(.xls)이면 엑셀에서 "다른 이름으로 저장 → Excel 통합 문서(.xlsx)"로 바꿔 주세요.');
+  const files = {}; let off = dv.getUint32(eocd + 16, true);
+  for (let k = 0, n = dv.getUint16(eocd + 10, true); k < n; k++) {
+    if (dv.getUint32(off, true) !== 0x02014b50) break;
+    const nlen = dv.getUint16(off + 28, true), elen = dv.getUint16(off + 30, true), clen = dv.getUint16(off + 32, true);
+    files[dec.decode(new Uint8Array(buf, off + 46, nlen))] = { method: dv.getUint16(off + 10, true), csize: dv.getUint32(off + 20, true), lho: dv.getUint32(off + 42, true) };
+    off += 46 + nlen + elen + clen;
+  }
+  const text = async name => {
+    const f = files[name]; if (!f) return null;
+    const start = f.lho + 30 + dv.getUint16(f.lho + 26, true) + dv.getUint16(f.lho + 28, true);
+    const data = new Uint8Array(buf, start, f.csize);
+    if (f.method === 0) return dec.decode(data);
+    if (f.method !== 8) throw new Error('지원하지 않는 압축 방식입니다.');
+    if (typeof DecompressionStream === 'undefined') throw new Error('이 브라우저는 엑셀 파일 읽기를 지원하지 않습니다. 최신 Chrome 또는 Edge를 사용하세요.');
+    const out = await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
+    return dec.decode(out);
+  };
+  const P = new DOMParser(), xml = s => P.parseFromString(s, 'application/xml'), all = (d, tag) => [...d.getElementsByTagNameNS('*', tag)];
+  const wb = await text('xl/workbook.xml'); if (!wb) throw new Error('엑셀 통합 문서 구조를 찾을 수 없습니다.');
+  const sheets = all(xml(wb), 'sheet').map(s => ({ name: s.getAttribute('name'), rid: s.getAttribute('r:id') || s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id') }));
+  const rels = {}; all(xml(await text('xl/_rels/workbook.xml.rels') || '<x/>'), 'Relationship').forEach(r => rels[r.getAttribute('Id')] = r.getAttribute('Target'));
+  const target = sheets.find(s => s.name === '장비등록') || sheets[0]; if (!target) throw new Error('시트가 없습니다.');
+  let path = rels[target.rid] || 'worksheets/sheet1.xml'; path = path.startsWith('/') ? path.slice(1) : 'xl/' + path.replace(/^\.\//, '');
+  const ssx = await text('xl/sharedStrings.xml');
+  const tText = el => all(el, 't').filter(t => t.parentNode.localName !== 'rPh').map(t => t.textContent).join(''); // 한글 엑셀의 윗주(rPh)는 제외
+  const ss = ssx ? all(xml(ssx), 'si').map(tText) : [];
+  const sx = await text(path); if (!sx) throw new Error('시트 내용을 읽을 수 없습니다.');
+  const rows = [];
+  all(xml(sx), 'row').forEach(r => {
+    const ri = (+r.getAttribute('r') || rows.length + 1) - 1, row = [];
+    all(r, 'c').forEach((c, idx) => {
+      const ref = c.getAttribute('r'); let ci = idx;
+      if (ref) { ci = 0; for (const ch of ref.replace(/\d+/g, '')) ci = ci * 26 + ch.charCodeAt(0) - 64; ci--; }
+      const t = c.getAttribute('t'), v = all(c, 'v')[0], vt = v ? v.textContent : '';
+      let val;
+      if (t === 's') val = ss[+vt] || ''; else if (t === 'inlineStr') val = tText(c);
+      else if (t === 'str' || t === 'd') val = vt; else if (t === 'b') val = vt === '1' ? 'TRUE' : 'FALSE';
+      else val = vt === '' ? '' : Number(vt);
+      row[ci] = val;
+    });
+    rows[ri] = row;
+  });
+  return { sheet: target.name, rows: Array.from(rows, r => r || []) };
+}
+function xlDate(v) { // 엑셀 날짜(일련번호 또는 글자) → YYYY-MM-DD
+  if (v === '' || v == null) return '';
+  if (typeof v === 'number') { if (v < 1 || v > 80000) return null; const d = new Date(Date.UTC(1899, 11, 30) + Math.round(v) * 86400000); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`; }
+  const m = /^(\d{4})\s*[-./년]\s*(\d{1,2})\s*[-./월]\s*(\d{1,2})/.exec(String(v).trim()); if (!m) return null;
+  const s = `${m[1]}-${pad(+m[2])}-${pad(+m[3])}`; return ymd(pd(s)) === s ? s : null;
+}
+async function importEquipFile(inp) {
+  const f = inp.files[0]; inp.value = ''; if (!f) return;
+  let data;
+  try { data = await readXlsx(await f.arrayBuffer()); } catch (e) { alert('엑셀 파일을 읽지 못했습니다.\n' + e.message); return; }
+  const norm = s => String(s == null ? '' : s).replace(/[\s*]/g, '').replace(/\(년\)/, '');
+  const hi = data.rows.findIndex(r => r.some(c => norm(c) === '자산번호') && r.some(c => norm(c) === '모델명'));
+  if (hi < 0) { alert('머리글 행(장비종류, 구분, 모델명, … 자산번호)을 찾지 못했습니다.\n[양식 내려받기]로 받은 양식을 사용해 주세요.'); return; }
+  const colIdx = {}; data.rows[hi].forEach((c, i) => { const k = IMPORT_COLS.find(x => norm(x[0]) === norm(c)); if (k && colIdx[k[1]] == null) colIdx[k[1]] = i; });
+  const missing = IMPORT_COLS.filter(c => c[2] && colIdx[c[1]] == null).map(c => c[0]);
+  if (missing.length) { alert('필수 열이 없습니다: ' + missing.join(', ')); return; }
+  const used = new Set(DB.equipment.map(e => e.assetNo)), inFile = new Set();
+  const ok = [], errs = [];
+  data.rows.slice(hi + 1).forEach((r, k) => {
+    const rowNo = hi + 2 + k, get = key => colIdx[key] == null ? '' : (r[colIdx[key]] == null ? '' : r[colIdx[key]]);
+    const raw = {}; IMPORT_COLS.forEach(c => raw[c[1]] = get(c[1]));
+    if (IMPORT_COLS.every(c => String(raw[c[1]]).trim() === '')) return; // 빈 행
+    const v = { type: String(raw.type).trim(), usage: String(raw.usage).trim(), name: String(raw.name).trim(), project: String(raw.project).trim(),
+      introDate: xlDate(raw.introDate), life: Number(String(raw.life).replace(/[^\d.]/g, '')), assetNo: String(raw.assetNo).trim(),
+      location: String(raw.location).trim(), position: String(raw.position).trim(), status: String(raw.status).trim(), note: String(raw.note).trim() };
+    const e = [];
+    if (!TYPES.includes(v.type)) e.push(`장비종류 "${v.type}" (${TYPES.join('/')} 중 하나)`);
+    if (!USAGES.includes(v.usage)) e.push(`구분 "${v.usage}" (${USAGES.join('/')} 중 하나)`);
+    if (!v.name) e.push('모델명 없음');
+    if (!v.introDate) e.push(`도입일 "${raw.introDate}" (날짜 형식 확인)`);
+    if (!(v.life > 0 && v.life <= 30)) e.push(`사용연한 "${raw.life}" (1~30 숫자)`);
+    if (v.assetNo) { if (used.has(v.assetNo)) e.push(`자산번호 ${v.assetNo} 이미 등록됨`); else if (inFile.has(v.assetNo)) e.push(`자산번호 ${v.assetNo} 파일 안에서 중복`); }
+    const okSt = v.usage === '대여용' ? ['대여 가능', '불용처리'] : ['사용 중', '불용처리'];
+    if (v.status && !okSt.includes(v.status)) e.push(`상태 "${v.status}" (${okSt.join('/')})`);
+    if (e.length) { errs.push({ rowNo, label: `${v.type} ${v.name} ${v.assetNo}`.trim(), msg: e.join(', ') }); return; }
+    if (v.assetNo) inFile.add(v.assetNo);
+    ok.push(v);
+  });
+  // 장비모델(도입 묶음) 매칭
+  const mkey = v => [v.type, v.usage, v.name, v.project, v.introDate, Number(v.life)].join('|');
+  const exist = {}; DB.models.forEach(m => exist[mkey(m)] = m);
+  const newModels = {}; ok.forEach(v => { const k = mkey(v); if (!exist[k] && !newModels[k]) newModels[k] = { type: v.type, usage: v.usage, name: v.name, project: v.project, introDate: v.introDate, life: Number(v.life), n: 0 }; if (newModels[k]) newModels[k].n++; });
+  const toExist = ok.filter(v => exist[mkey(v)]).length;
+  const nm = Object.values(newModels);
+  const body = `<div class="kv"><span>파일 <b>${h(f.name)}</b> · 시트 "${h(data.sheet)}"</span></div>
+    <div class="cards" style="margin-bottom:10px">
+      <div class="card green"><div class="k">등록 가능</div><div class="v">${ok.length}대</div></div>
+      <div class="card"><div class="k">새 장비모델</div><div class="v">${nm.length}개</div><div class="muted">${nm.reduce((s, x) => s + x.n, 0)}대</div></div>
+      <div class="card"><div class="k">기존 장비모델에 추가</div><div class="v">${toExist}대</div></div>
+      <div class="card ${errs.length ? 'red' : ''}"><div class="k">오류 행 (제외)</div><div class="v">${errs.length}행</div></div></div>
+    ${nm.length ? `<h3>새로 만들 장비모델</h3><div class="tablewrap" style="max-height:160px;margin-bottom:10px"><table class="t"><thead><tr><th>종류</th><th>구분</th><th>모델명</th><th>도입사업명</th><th>도입일</th><th class="n">사용연한</th><th class="n">대수</th></tr></thead><tbody>${nm.map(m => `<tr><td>${h(m.type)}</td><td>${h(m.usage)}</td><td>${h(m.name)}</td><td>${h(m.project)}</td><td>${h(m.introDate)}</td><td class="n">${m.life}년</td><td class="n">${m.n}</td></tr>`).join('')}</tbody></table></div>` : ''}
+    ${errs.length ? `<h3 class="txt-red">오류 행 — 고쳐서 다시 첨부하거나, 이 행을 빼고 등록할 수 있습니다</h3><div class="tablewrap" style="max-height:200px"><table class="t"><thead><tr><th class="n">엑셀 행</th><th>내용</th><th>오류</th></tr></thead><tbody>${errs.slice(0, 200).map(x => `<tr><td class="n">${x.rowNo}</td><td>${h(x.label)}</td><td class="txt-red">${h(x.msg)}</td></tr>`).join('')}${errs.length > 200 ? `<tr><td colspan="3" class="muted">… 외 ${errs.length - 200}행</td></tr>` : ''}</tbody></table></div>` : ''}
+    ${!ok.length ? '<div class="empty">등록할 수 있는 행이 없습니다.</div>' : ''}`;
+  openModal('엑셀로 장비 추가 — 확인', body, ok.length ? () => {
+    Object.entries(newModels).forEach(([k, m]) => { const nmodel = { id: uid('M'), type: m.type, usage: m.usage, name: m.name, project: m.project, introDate: m.introDate, life: m.life }; DB.models.push(nmodel); exist[k] = nmodel; });
+    const PFXS = { 노트북: 'NB', PC: 'PC', 모니터: 'MN', 프린터: 'PR' }, maxSeq = {};
+    DB.equipment.concat(ok.filter(v => v.assetNo)).forEach(e => { const mm = /^([A-Z]+)\d{2}-(\d+)$/.exec(e.assetNo); if (mm) maxSeq[mm[1]] = Math.max(maxSeq[mm[1]] || 0, +mm[2]); });
+    ok.forEach(v => {
+      const m = exist[mkey(v)], P = PFXS[m.type] || 'EQ';
+      const assetNo = v.assetNo || `${P}${m.introDate.slice(2, 4)}-${String(maxSeq[P] = (maxSeq[P] || 0) + 1).padStart(4, '0')}`;
+      DB.equipment.push({ assetNo, modelId: m.id, location: v.location || (isRental(m) ? RENTAL_LOC : ''), position: isRental(m) ? '' : v.position, status: v.status || (isRental(m) ? '대여 가능' : '사용 중'), note: v.note });
+      ensureDept(v.location);
+    });
+    changed(`엑셀에서 장비 ${ok.length}대를 등록했습니다.${nm.length ? ` (새 장비모델 ${nm.length}개)` : ''}`);
+  } : null, errs.length ? `오류 행 빼고 ${ok.length}대 등록` : `${ok.length}대 등록`, [], { wide: true, cancelLabel: ok.length ? '취소' : '닫기' });
+}
+
 /* ---------- 대여현황 / 소모품 현재고 엑셀 ---------- */
 function exportRental() {
   buildIndex();
@@ -1885,7 +2072,7 @@ function exportRental() {
   rmodels.forEach(m => {
     const xs = rental.filter(e => e.modelId === m.id), n = st => xs.filter(e => e.status === st).length, ls = lifeStatus(m, t);
     const v = [n('대여 가능'), n('대여 중'), n('불용처리'), xs.length]; v.forEach((x, i) => tot[i] += x);
-    s2.rows.push([{ v: m.type, s: X.center }, { v: m.name, s: X.cell }, { v: m.project, s: X.cell }, { v: m.introDate, s: X.center }, { v: expiry(m), s: X.center }, ...v.map(x => ({ v: x, s: X.num })), { v: ls, s: ls === '불용 대상' ? X.red : ls === '정상' ? X.center : X.orange }]);
+    s2.rows.push([{ v: m.type, s: X.center }, { v: m.name, s: X.cell }, { v: m.project, s: X.cell }, { v: m.introDate, s: X.center }, { v: expiry(m), s: X.center }, ...v.map(x => ({ v: x, s: X.num })), { v: ls, s: lifeX(ls) }]);
   });
   const r2 = s2.rows.length + 1;
   s2.rows.push([{ v: '합계', s: X.total }, ...[0, 0, 0, 0].map(() => ({ v: '', s: X.total })), ...tot.map(x => ({ v: x, s: X.totalNum })), { v: '', s: X.total }]);
@@ -1897,7 +2084,7 @@ function exportRental() {
   rental.slice().sort(sortEquip).forEach(e => {
     const m = MM[e.modelId], l = LOAN_BY_ASSET[e.assetNo], ls = lifeStatus(m, t);
     s3.rows.push([{ v: e.assetNo, s: X.center }, { v: m.type, s: X.center }, { v: m.name, s: X.cell }, { v: e.status, s: X.center }, { v: l ? l.dept : '', s: X.cell }, { v: l ? l.position : '', s: X.center },
-      { v: l ? l.dueDate : '', s: X.center }, l ? { v: diffDays(t, l.dueDate), s: X.num } : { v: '', s: X.cell }, { v: ls, s: ls === '불용 대상' ? X.red : ls === '정상' ? X.center : X.orange }]);
+      { v: l ? l.dueDate : '', s: X.center }, l ? { v: diffDays(t, l.dueDate), s: X.num } : { v: '', s: X.cell }, { v: ls, s: lifeX(ls) }]);
   });
   download(buildXlsx([s1, s2, s3]), `대여현황_${stamp()}.xlsx`);
   toast('대여현황 엑셀을 내려받았습니다.');
@@ -1928,11 +2115,11 @@ function exportStock() {
 /* =====================================================================
    XLSX 생성 (외부 라이브러리 없이 파일 내부에서 생성)
    ===================================================================== */
-const X = { title: 1, header: 2, cell: 3, num: 4, sub: 5, subNum: 6, bold: 7, red: 8, orange: 9, total: 10, totalNum: 11, info: 12, center: 13, orangeL: 14, redSub: 15, redSubNum: 16 };
+const X = { title: 1, header: 2, cell: 3, num: 4, sub: 5, subNum: 6, bold: 7, red: 8, orange: 9, total: 10, totalNum: 11, info: 12, center: 13, orangeL: 14, redSub: 15, redSubNum: 16, yellow: 17 };
 const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts>
-<fonts count="7">
+<fonts count="8">
 <font><sz val="10"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font>
 <font><b/><sz val="16"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font>
 <font><b/><sz val="10"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font>
@@ -1940,6 +2127,7 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <font><b/><sz val="10"/><color rgb="FFC65911"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font>
 <font><sz val="9"/><color rgb="FF595959"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font>
 <font><sz val="10"/><color rgb="FFC65911"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font>
+<font><b/><sz val="10"/><color rgb="FF8D6E00"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font>
 </fonts>
 <fills count="6">
 <fill><patternFill patternType="none"/></fill>
@@ -1954,7 +2142,7 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <border><left style="thin"><color rgb="FF9E9E9E"/></left><right style="thin"><color rgb="FF9E9E9E"/></right><top style="thin"><color rgb="FF9E9E9E"/></top><bottom style="thin"><color rgb="FF9E9E9E"/></bottom><diagonal/></border>
 </borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="17">
+<cellXfs count="18">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
 <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf>
 <xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
@@ -1972,12 +2160,13 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xf numFmtId="0" fontId="6" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
 <xf numFmtId="0" fontId="3" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
 <xf numFmtId="164" fontId="3" fillId="5" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>
+<xf numFmtId="0" fontId="7" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
 </cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
 function colName(i) { let s = ''; i++; while (i > 0) { const r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = Math.floor((i - 1) / 26); } return s; }
 function xesc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ''); }
-function sheetXml(sh) {
+function sheetXml(sh, sst) { // sst: 공유 문자열 목록(엑셀 표준 방식). 없으면 셀 안에 직접 저장
   const ncol = Math.max(sh.cols.length, ...sh.rows.map(r => (r || []).length));
   let data = '';
   sh.rows.forEach((row, ri) => {
@@ -1988,6 +2177,11 @@ function sheetXml(sh) {
       const ref = colName(ci) + (ri + 1), s = c.s || 0;
       if (c.v === '' || c.v == null) cells += `<c r="${ref}" s="${s}"/>`;
       else if (typeof c.v === 'number' && isFinite(c.v)) cells += `<c r="${ref}" s="${s}"><v>${c.v}</v></c>`;
+      else if (sst) {
+        const str = String(c.v); let idx = sst.map.get(str);
+        if (idx == null) { idx = sst.list.length; sst.list.push(str); sst.map.set(str, idx); }
+        sst.count++; cells += `<c r="${ref}" s="${s}" t="s"><v>${idx}</v></c>`;
+      }
       else cells += `<c r="${ref}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${xesc(c.v)}</t></is></c>`;
     });
     data += `<row r="${ri + 1}"${ht}>${cells}</row>`;
@@ -2002,6 +2196,7 @@ function sheetXml(sh) {
 <cols>${sh.cols.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols>
 <sheetData>${data}</sheetData>
 ${sh.merges && sh.merges.length ? `<mergeCells count="${sh.merges.length}">${sh.merges.map(m => `<mergeCell ref="${m}"/>`).join('')}</mergeCells>` : ''}
+${sh.validations && sh.validations.length ? `<dataValidations count="${sh.validations.length}">${sh.validations.map(v => `<dataValidation type="list" allowBlank="1" showErrorMessage="1" errorTitle="입력 확인" error="목록에서 선택하세요" sqref="${v.sqref}"><formula1>${xesc('"' + v.list.join(',') + '"')}</formula1></dataValidation>`).join('')}</dataValidations>` : ''}
 <printOptions horizontalCentered="1"/>
 <pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>
 <pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>
@@ -2011,16 +2206,24 @@ ${sh.merges && sh.merges.length ? `<mergeCells count="${sh.merges.length}">${sh.
 function buildXlsx(sheets) {
   const files = [];
   files.push({ name: '[Content_Types].xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheets.map((s, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>` });
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheets.map((s, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>` });
+  const nowIso = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  files.push({ name: 'docProps/core.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:creator>자원관리 도우미</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${nowIso}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${nowIso}</dcterms:modified></cp:coreProperties>` });
+  files.push({ name: 'docProps/app.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Microsoft Excel</Application></Properties>` });
   files.push({ name: '_rels/.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>` });
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>` });
   const defs = sheets.map((s, i) => s.freeze ? `<definedName name="_xlnm.Print_Titles" localSheetId="${i}">'${xesc(s.name)}'!$${s.freeze}:$${s.freeze}</definedName>` : '').join('');
   files.push({ name: 'xl/workbook.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets>${sheets.map((s, i) => `<sheet name="${xesc(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets>${defs ? `<definedNames>${defs}</definedNames>` : ''}</workbook>` });
   files.push({ name: 'xl/_rels/workbook.xml.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((s, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` });
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((s, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId${sheets.length + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>` });
   files.push({ name: 'xl/styles.xml', data: STYLES_XML });
-  sheets.forEach((s, i) => files.push({ name: `xl/worksheets/sheet${i + 1}.xml`, data: sheetXml(s) }));
+  const sst = { list: [], map: new Map(), count: 0 };
+  sheets.forEach((s, i) => files.push({ name: `xl/worksheets/sheet${i + 1}.xml`, data: sheetXml(s, sst) }));
+  files.push({ name: 'xl/sharedStrings.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${sst.count}" uniqueCount="${sst.list.length}">${sst.list.map(s => `<si><t xml:space="preserve">${xesc(s)}</t></si>`).join('')}</sst>` });
   return zipStore(files, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 }
 const CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
