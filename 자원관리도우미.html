@@ -390,7 +390,7 @@ function fmtField(f, v) {
 }
 const DIFF_DEF = [
   { k: 'models', key: 'id', label: '장비모델', name: m => `${m.type} · ${m.name} (${m.project || '-'})`, f: { type: '장비종류', usage: '구분', name: '모델명', project: '도입사업명', introDate: '도입일', life: '사용연한(년)' } },
-  { k: 'equipment', key: 'assetNo', label: '장비', name: e => { const m = anyModel(e.modelId); return `${e.assetNo}${m ? ` · ${m.type} ${m.name}` : ''}`; }, f: { modelId: '모델', location: '위치·사용부서', position: '사용자 직책', status: '상태', note: '비고' } },
+  { k: 'equipment', key: 'assetNo', label: '장비', name: e => { const m = anyModel(e.modelId); return `${e.assetNo}${m ? ` · ${m.type} ${m.name}` : ''}`; }, f: { modelId: '모델', serial: 'S/N', location: '위치·사용부서', position: '사용자 직책', status: '상태', note: '비고' } },
   { k: 'loans', key: 'id', label: '대여', name: l => `${l.assetNo} · ${l.dept} ${l.position} (공문 ${l.docNo})`, f: { assetNo: '자산번호', dept: '대여 부서', position: '직책', docNo: '공문번호', loanDate: '대여일', dueDate: '반납예정일', loanChecker: '대여 확인자', returnDate: '실제 반납일', returnChecker: '반납 확인자' } },
   { k: 'consumables', key: 'id', label: '소모품', name: c => `${c.printerModel} · ${c.name}`, f: { printerModel: '프린터 모델', kind: '종류', name: '품명', price: '단가', initialStock: '최초 재고', registeredDate: '등록일' } },
   { k: 'stockLogs', key: 'id', label: '입출고', name: l => `${l.date} ${l.kind} · ${csName(l.consumableId)} ${l.qty}개${l.dept ? ` (${l.dept})` : ''}`, f: { date: '일자', kind: '구분', consumableId: '소모품', qty: '수량', dept: '수령부서', handler: '담당자', returnQty: '폐토너 반납', note: '비고' } },
@@ -474,6 +474,7 @@ function makeSample() {
   const seq = { 노트북: 0, PC: 0, 모니터: 0, 프린터: 0 }, PFX = { 노트북: 'NB', PC: 'PC', 모니터: 'MN', 프린터: 'PR' };
   let mid = 0;
   const instPos = ['주무관', '주무관', '주무관', '주무관', '팀장', '과장'];
+  const SN_CH = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789';
 
   // spec: {exp: 오늘 기준 만료까지 일수} | {ago: 도입 후 경과 개월} | {expAt: 만료일}
   function M(type, usage, name, project, spec, life, count, disposed = 0) {
@@ -483,12 +484,14 @@ function makeSample() {
     else intro = addMonths(t, -spec.ago);
     const m = { id: 'M' + pad(++mid).padStart(3, '0'), type, usage, name, project: `${intro.slice(0, 4)}년 ${project}`, introDate: intro, life };
     models.push(m);
+    const snPrefix = { LG: 'LG', 삼성: 'SS', HP: 'HP', 레노버: 'LN', 델: 'DL', 캐논: 'CN', Epson: 'EP', 신도리코: 'SD' }[name.split(' ')[0]] || 'XX';
     for (let i = 0; i < count; i++) {
       seq[type]++;
       const assetNo = `${PFX[type]}${intro.slice(2, 4)}-${String(seq[type]).padStart(4, '0')}`;
       const st = i < disposed ? '불용처리' : (usage === '대여용' ? '대여 가능' : '사용 중');
-      if (usage === '대여용') equipment.push({ assetNo, modelId: m.id, location: RENTAL_LOC, position: '', status: st, note: st === '불용처리' ? '불용 처리 완료' : '' });
-      else equipment.push({ assetNo, modelId: m.id, location: pick(DEPTS), position: pick(instPos), status: st, note: st === '불용처리' ? '불용 처리 완료' : '' });
+      const serial = snPrefix + intro.slice(2, 4) + Array.from({ length: 6 }, () => SN_CH[Math.floor(rnd() * SN_CH.length)]).join(''); // 가상 S/N
+      if (usage === '대여용') equipment.push({ assetNo, modelId: m.id, serial, location: RENTAL_LOC, position: '', status: st, note: st === '불용처리' ? '불용 처리 완료' : '' });
+      else equipment.push({ assetNo, modelId: m.id, serial, location: pick(DEPTS), position: pick(instPos), status: st, note: st === '불용처리' ? '불용 처리 완료' : '' });
     }
     return m;
   }
@@ -706,16 +709,44 @@ function renderTop() {
 }
 function go(screen) { S.screen = screen; render(); window.scrollTo(0, 0); }
 
+/* 화면을 다시 그릴 때 입력 중인 글상자는 그대로 둔다.
+   글상자를 새로 만들면 한글 조합(IME)이 끊겨 "민원과"가 "ㅁㅣㄴㅇㅜㅓㄴ…"처럼 낱자로 들어가기 때문.
+   새 화면에서 같은 id의 글상자까지 이어지는 조상 요소만 남기고, 나머지 형제 요소를 새것으로 바꾼다. */
+function patchKeeping(root, html, keep) {
+  const tmp = document.createElement(root.tagName); tmp.innerHTML = html;
+  const nk = tmp.querySelector('#' + CSS.escape(keep.id)); if (!nk || nk.tagName !== keep.tagName) return false;
+  const oc = [], nc = [];
+  for (let e = keep; e !== root; e = e.parentNode) { if (!e) return false; oc.unshift(e); }
+  for (let e = nk; e !== tmp; e = e.parentNode) { if (!e) return false; nc.unshift(e); }
+  if (oc.length !== nc.length || oc.some((e, i) => e.tagName !== nc[i].tagName)) return false;
+  let op = root, np = tmp;
+  for (let i = 0; i < oc.length; i++) {
+    const keepChild = oc[i], newChild = nc[i], kids = [...np.childNodes], at = kids.indexOf(newChild);
+    [...op.childNodes].forEach(ch => { if (ch !== keepChild) op.removeChild(ch); });
+    kids.slice(0, at).forEach(ch => op.insertBefore(ch, keepChild));
+    kids.slice(at + 1).forEach(ch => op.appendChild(ch));
+    if (i < oc.length - 1) { // 조상 요소는 속성만 새것으로
+      [...keepChild.attributes].forEach(a => { if (!newChild.hasAttribute(a.name)) keepChild.removeAttribute(a.name); });
+      [...newChild.attributes].forEach(a => keepChild.setAttribute(a.name, a.value));
+    }
+    op = keepChild; np = newChild;
+  }
+  return true;
+}
 function render() {
   const ae = document.activeElement, fid = ae && ae.id;
   let sel = null; try { sel = [ae.selectionStart, ae.selectionEnd]; } catch (e) { }
   buildIndex();
   renderTop();
   const main = document.getElementById('main');
-  main.innerHTML = ({ home: renderHome, equip: renderEquip, cons: renderCons, report: renderReport, depts: renderDepts })[S.screen]();
-  if (fid) {
-    const el = document.getElementById(fid);
-    if (el && main.contains(el)) { el.focus(); try { if (sel && sel[0] != null) el.setSelectionRange(sel[0], sel[1]); } catch (e) { } }
+  const html = ({ home: renderHome, equip: renderEquip, cons: renderCons, report: renderReport, depts: renderDepts })[S.screen]();
+  const typing = fid && ae.tagName === 'INPUT' && ['text', 'search', ''].includes(ae.type) && main.contains(ae);
+  if (!(typing && patchKeeping(main, html, ae))) {
+    main.innerHTML = html;
+    if (fid) {
+      const el = document.getElementById(fid);
+      if (el && main.contains(el)) { el.focus(); try { if (sel && sel[0] != null) el.setSelectionRange(sel[0], sel[1]); } catch (e) { } }
+    }
   }
   enhanceTables(main);
   if (S.highlight) {
@@ -1125,7 +1156,7 @@ function renderHistory() {
     if (S.hf.dept && l.dept !== S.hf.dept) return false;
     if (S.hf.status === 'active' && l.returnDate) return false;
     if (S.hf.status === 'done' && !l.returnDate) return false;
-    if (q) { const e = eqOf(l.assetNo), m = e ? MM[e.modelId] : null; if (!(l.assetNo.toLowerCase().includes(q) || (m && m.name.toLowerCase().includes(q)) || l.docNo.toLowerCase().includes(q))) return false; }
+    if (q) { const e = eqOf(l.assetNo), m = e ? MM[e.modelId] : null; if (![l.assetNo, m && m.name, e && e.serial, l.docNo, l.dept].some(s => (s || '').toLowerCase().includes(q))) return false; }
     return true;
   }).sort((a, b) => cmp(b.loanDate, a.loanDate));
   const depts = [...new Set(DB.loans.map(l => l.dept))].sort();
@@ -1135,14 +1166,14 @@ function renderHistory() {
     if (!l.returnDate) st = l.dueDate < t ? '<span class="badge b-red">대여 중(기한 초과)</span>' : '<span class="badge b-orange">대여 중</span>';
     else st = l.returnDate > l.dueDate ? `<span class="badge b-gray">반납(${diffDays(l.dueDate, l.returnDate)}일 지연)</span>` : '<span class="badge b-green">반납 완료</span>';
     const days = diffDays(l.loanDate, l.returnDate || t);
-    return `<tr><td>${h(l.loanDate)}</td><td>${h(l.assetNo)}</td><td>${h((m.type || '') + ' ' + (m.name || ''))}</td><td>${h(l.dept)}</td><td>${h(l.position)}</td><td>${h(l.docNo)}</td>
+    return `<tr><td>${h(l.loanDate)}</td><td>${h(l.assetNo)}</td><td>${h((m.type || '') + ' ' + (m.name || ''))}</td><td>${h(e && e.serial || '')}</td><td>${h(l.dept)}</td><td>${h(l.position)}</td><td>${h(l.docNo)}</td>
       <td>${h(l.dueDate)}</td><td>${h(l.returnDate || '')}</td><td class="n">${days}일</td><td class="c">${h(WLABEL[l.loanChecker] || '')}</td><td class="c">${h(WLABEL[l.returnChecker] || '')}</td><td>${st}</td></tr>`;
   }).join('');
   const byDept = {}; list.forEach(l => { byDept[l.dept] = byDept[l.dept] || { n: 0, a: 0 }; byDept[l.dept].n++; if (!l.returnDate) byDept[l.dept].a++; });
   const deptRows = Object.entries(byDept).sort((a, b) => b[1].n - a[1].n).map(([d, v]) => `<tr><td><a href="#" onclick="S.hf.dept=${ja(d)};render();return false">${h(d)}</a></td><td class="n">${v.n}</td><td class="n">${v.a}</td></tr>`).join('');
   return `
   <div class="panel">
-    <div class="filters"><label>장비·모델·공문번호</label><input id="hfAsset" value="${h(S.hf.asset)}" placeholder="자산번호/모델명/공문번호" oninput="S.hf.asset=this.value;render()">
+    <div class="filters"><label>검색</label><input id="hfAsset" value="${h(S.hf.asset)}" placeholder="자산번호/모델명/S·N/공문번호/부서" style="width:240px" oninput="S.hf.asset=this.value;render()">
       <label>부서</label>${fSel('hfDept', [['', '전체'], ...depts], S.hf.dept, `onchange="S.hf.dept=this.value;render()"`)}
       <label>상태</label>${fSel('hfStatus', [['', '전체'], ['active', '대여 중'], ['done', '반납 완료']], S.hf.status, `onchange="S.hf.status=this.value;render()"`)}
       <button class="btn sm" onclick="S.hf=Object.assign({asset:'',dept:'',status:''},histPeriod('year1'));render()">필터 초기화</button>
@@ -1153,8 +1184,8 @@ function renderHistory() {
       ${[['year1', '최근 1년'], ['thisYear', '올해'], ['lastYear', '작년'], ['all', '전체']].map(([k, l]) => { const p = histPeriod(k); const on = p.from === S.hf.from && p.to === S.hf.to; return `<button class="btn sm${on ? ' primary' : ''}" onclick="setHistPeriod('${k}')">${l}</button>`; }).join('')}
       <span class="muted">${S.hf.from || S.hf.to ? `${S.hf.from || '처음'} ~ ${S.hf.to || '현재'} 에 대여한 기록` : '전체 기간'} · 기본값은 이번 달을 포함한 최근 12개월</span></div>
     <div class="grid" style="grid-template-columns:1fr 240px">
-      <div class="tablewrap"><table class="t"><thead><tr><th>대여일</th><th>자산번호</th><th>모델</th><th>대여 부서</th><th>직책</th><th>공문번호</th><th>반납예정일</th><th>실제 반납일</th><th class="n">기간</th><th class="c">대여 확인</th><th class="c">반납 확인</th><th>상태</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="12" class="empty">기록이 없습니다.</td></tr>'}</tbody></table></div>
+      <div class="tablewrap"><table class="t"><thead><tr><th>대여일</th><th>자산번호</th><th>모델</th><th>S/N</th><th>대여 부서</th><th>직책</th><th>공문번호</th><th>반납예정일</th><th>실제 반납일</th><th class="n">기간</th><th class="c">대여 확인</th><th class="c">반납 확인</th><th>상태</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="13" class="empty">기록이 없습니다.</td></tr>'}</tbody></table></div>
       <div class="tablewrap"><table class="t"><thead><tr><th>부서별</th><th class="n">대여</th><th class="n">진행</th></tr></thead><tbody>${deptRows}</tbody></table></div>
     </div></div>`;
 }
@@ -1167,21 +1198,21 @@ function renderAllEquip() {
     if (f.usage && m.usage !== f.usage) return false;
     if (f.status && e.status !== f.status) return false;
     if (f.life && lifeStatus(m, t) !== f.life) return false;
-    if (q && !(e.assetNo.toLowerCase().includes(q) || m.name.toLowerCase().includes(q) || (locOf(e) || '').toLowerCase().includes(q) || (m.project || '').toLowerCase().includes(q))) return false;
+    if (q && ![e.assetNo, m.name, e.serial, locOf(e), m.project].some(s => (s || '').toLowerCase().includes(q))) return false;
     return true;
   }).sort(sortEquip);
-  list = sortData('eqAll', list, e => { const m = MM[e.modelId]; return [e.assetNo, m.type, m.usage, m.name, m.project, m.introDate, expiry(m), lifeStatus(m, t), e.status, locOf(e), posOf(e), e.note]; });
+  list = sortData('eqAll', list, e => { const m = MM[e.modelId]; return [e.assetNo, m.type, m.usage, m.name, e.serial, m.project, m.introDate, expiry(m), lifeStatus(m, t), e.status, locOf(e), posOf(e), e.note]; });
   const pages = Math.max(1, Math.ceil(list.length / PAGE)); if (S.aPage >= pages) S.aPage = pages - 1;
   const slice = list.slice(S.aPage * PAGE, S.aPage * PAGE + PAGE);
   const rows = slice.map(e => {
     const m = MM[e.modelId];
-    return `<tr id="eq-${h(e.assetNo)}"><td>${h(e.assetNo)}</td><td>${h(m.type)}</td><td>${h(m.usage)}</td><td>${h(m.name)}</td><td>${h(m.project)}</td><td>${h(m.introDate)}</td><td>${expiry(m)}</td>
+    return `<tr id="eq-${h(e.assetNo)}"><td>${h(e.assetNo)}</td><td>${h(m.type)}</td><td>${h(m.usage)}</td><td>${h(m.name)}</td><td>${h(e.serial || '')}</td><td>${h(m.project)}</td><td>${h(m.introDate)}</td><td>${expiry(m)}</td>
     <td>${lifeBadge(lifeStatus(m, t))}</td><td>${eqBadge(e.status)}</td><td>${h(locOf(e))}</td><td>${h(posOf(e))}</td><td class="muted">${h(e.note || '')}</td>
     <td><button class="btn sm" onclick="editEquipModal(${ja(e.assetNo)})">수정</button></td></tr>`;
   }).join('');
   return `
   <div class="panel">
-    <div class="filters"><label>검색</label><input id="afQ" value="${h(f.q)}" placeholder="자산번호/모델/부서/사업명" oninput="S.af.q=this.value;S.aPage=0;render()">
+    <div class="filters"><label>검색</label><input id="afQ" value="${h(f.q)}" placeholder="자산번호/모델/S·N/부서/사업명" style="width:240px" oninput="S.af.q=this.value;S.aPage=0;render()">
       <label>종류</label>${fSel('afType', [['', '전체'], ...TYPES], f.type, `onchange="S.af.type=this.value;S.aPage=0;render()"`)}
       <label>구분</label>${fSel('afUsage', [['', '전체'], ...USAGES], f.usage, `onchange="S.af.usage=this.value;S.aPage=0;render()"`)}
       <label>상태</label>${fSel('afStatus', [['', '전체'], ...EQ_STATUS], f.status, `onchange="S.af.status=this.value;S.aPage=0;render()"`)}
@@ -1189,8 +1220,8 @@ function renderAllEquip() {
       <span class="muted">${fmtN(list.length)}대</span><div class="spacer"></div>
       ${list.some(e => e.status !== '불용처리' && lifeStatus(MM[e.modelId], t) === '불용 대상') && f.life === '불용 대상' ? `<button class="btn danger" onclick="bulkDispose()">목록의 불용 대상 일괄 불용처리</button>` : ''}
       <button class="btn" onclick="downloadEquipTemplate()" title="엑셀로 여러 대를 한 번에 등록할 때 쓰는 양식">📄 기본 양식 내려받기</button><button class="btn" onclick="equipImportClick()" title="작성한 양식(.xlsx)을 첨부해 장비 등록">📎 엑셀 첨부</button><button class="btn primary" onclick="addEquipModal()">+ 장비 추가</button></div>
-    <div class="tablewrap"><table class="t" data-sort="eqAll"><thead><tr><th>자산번호</th><th>종류</th><th>구분</th><th>모델명</th><th>도입사업명</th><th>도입일</th><th>만료일</th><th>사용연한</th><th>상태</th><th>위치·사용부서</th><th>사용자 직책</th><th>비고</th><th></th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="13" class="empty">해당 장비가 없습니다.</td></tr>'}</tbody></table></div>
+    <div class="tablewrap"><table class="t" data-sort="eqAll"><thead><tr><th>자산번호</th><th>종류</th><th>구분</th><th>모델명</th><th>S/N</th><th>도입사업명</th><th>도입일</th><th>만료일</th><th>사용연한</th><th>상태</th><th>위치·사용부서</th><th>사용자 직책</th><th>비고</th><th></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="14" class="empty">해당 장비가 없습니다.</td></tr>'}</tbody></table></div>
     <div class="pager"><button class="btn sm" ${S.aPage <= 0 ? 'disabled' : ''} onclick="S.aPage--;render()">◀ 이전</button> ${S.aPage + 1} / ${pages} 페이지 <button class="btn sm" ${S.aPage >= pages - 1 ? 'disabled' : ''} onclick="S.aPage++;render()">다음 ▶</button></div>
   </div>`;
 }
@@ -1199,7 +1230,7 @@ function bulkDispose() {
   const list = DB.equipment.filter(e => {
     const m = MM[e.modelId];
     return e.status !== '불용처리' && e.status !== '대여 중' && lifeStatus(m, t) === '불용 대상' && (!f.type || m.type === f.type) && (!f.usage || m.usage === f.usage) && (!f.status || e.status === f.status)
-      && (!q || e.assetNo.toLowerCase().includes(q) || m.name.toLowerCase().includes(q) || (e.location || '').toLowerCase().includes(q) || (m.project || '').toLowerCase().includes(q));
+      && (!q || [e.assetNo, m.name, e.serial, locOf(e), m.project].some(s => (s || '').toLowerCase().includes(q)));
   });
   if (!list.length) { alert('불용처리할 장비가 없습니다. (대여 중 장비는 제외)'); return; }
   if (!confirm(`목록의 불용 대상 ${list.length}대를 불용처리할까요?`)) return;
@@ -1214,12 +1245,16 @@ function editEquipModal(assetNo) {
   openModal(`장비 수정 · ${assetNo}`,
     `<div class="kv"><span><b>${h(modelLabel(m))}</b></span><span>${h(m.usage)}</span><span>만료일 <b>${expiry(m)}</b></span></div>` +
     fRow('모델', fSel('eModel', DB.models.filter(x => x.type === m.type).map(x => [x.id, `${x.name} · ${x.project} (${x.usage})`]), e.modelId)) +
+    fRow('S/N', fIn('eSn', e.serial || '', 'text', 'placeholder="제조사 시리얼 번호"')) +
     fRow('위치·사용부서', fIn('eLoc', e.location, 'text', 'list="dlDept"')) +
     (!isRental(m) ? fRow('사용자 직책', fIn('ePos', e.position, 'text', 'list="dlPos"')) : '') +
     fRow('상태', fSel('eSt', stOpts, e.status)) +
     (loaning ? '<div class="hint">대여 중인 장비는 반납 처리 후 상태를 바꿀 수 있습니다.</div>' : '') +
     fRow('비고', fIn('eNote', e.note)),
     () => {
+      const sn = gv('eSn'), dup = serialOwner(sn, e.assetNo);
+      if (dup && !confirm(`S/N ${sn}은(는) 이미 ${dup.assetNo} 장비에 등록되어 있습니다. 그래도 저장할까요?`)) return false;
+      e.serial = sn;
       e.modelId = gv('eModel'); e.location = gv('eLoc'); ensureDept(e.location); if (document.getElementById('ePos')) e.position = gv('ePos');
       e.status = gv('eSt'); e.note = gv('eNote');
       const nm = MM[e.modelId];
@@ -1235,6 +1270,7 @@ function editEquipModal(assetNo) {
       }
     }]);
 }
+function serialOwner(sn, exceptAsset) { sn = (sn || '').trim().toUpperCase(); return sn ? DB.equipment.find(x => x.assetNo !== exceptAsset && (x.serial || '').trim().toUpperCase() === sn) : null; }
 function addEquipModal(modelId) {
   if (!DB.models.length) { alert('먼저 장비모델을 등록하세요.'); return; }
   const opts = DB.models.slice().sort((a, b) => TYPES.indexOf(a.type) - TYPES.indexOf(b.type) || cmp(a.introDate, b.introDate)).map(m => [m.id, `${m.type} · ${m.name} · ${m.project} (${m.usage})`]);
@@ -1242,6 +1278,7 @@ function addEquipModal(modelId) {
     fRow('장비모델', fSel('aModel', opts, modelId || opts[0][0]), true) +
     fRow('추가 대수', fIn('aCnt', 1, 'number', 'min="1" max="500"'), true) +
     fRow('자산번호', fIn('aAsset', '', 'text', 'placeholder="비워두면 자동 생성 (1대일 때만 직접 입력)"')) +
+    fRow('S/N', fIn('aSn', '', 'text', 'placeholder="1대일 때만 입력 (여러 대는 등록 후 각각 수정)"')) +
     fRow('위치·사용부서', fIn('aLoc', '', 'text', 'list="dlDept" placeholder="대여용은 비워두면 대여 보관"')) +
     fRow('사용자 직책', fIn('aPos', '', 'text', 'list="dlPos" placeholder="설치·재활용 장비만"')) +
     fRow('비고', fIn('aNote', '')),
@@ -1251,12 +1288,16 @@ function addEquipModal(modelId) {
       const manual = gv('aAsset');
       if (manual && n !== 1) return mErr('자산번호를 직접 입력할 때는 1대만 추가할 수 있습니다.');
       if (manual && DB.equipment.some(e => e.assetNo === manual)) return mErr('이미 있는 자산번호입니다.');
+      const sn = gv('aSn');
+      if (sn && n !== 1) return mErr('S/N은 1대를 추가할 때만 입력할 수 있습니다.');
+      const dup = serialOwner(sn);
+      if (dup && !confirm(`S/N ${sn}은(는) 이미 ${dup.assetNo} 장비에 등록되어 있습니다. 그래도 추가할까요?`)) return false;
       ensureDept(gv('aLoc'));
       const PFX = { 노트북: 'NB', PC: 'PC', 모니터: 'MN', 프린터: 'PR' }[m.type] || 'EQ';
       let maxSeq = 0; DB.equipment.forEach(e => { const mm = /^([A-Z]+)\d{2}-(\d+)$/.exec(e.assetNo); if (mm && mm[1] === PFX) maxSeq = Math.max(maxSeq, +mm[2]); });
       for (let i = 0; i < n; i++) {
         const assetNo = manual || `${PFX}${m.introDate.slice(2, 4)}-${String(++maxSeq).padStart(4, '0')}`;
-        DB.equipment.push({ assetNo, modelId: m.id, location: gv('aLoc') || (m.usage === '대여용' ? RENTAL_LOC : ''), position: !isRental(m) ? gv('aPos') : '', status: isRental(m) ? '대여 가능' : '사용 중', note: gv('aNote') });
+        DB.equipment.push({ assetNo, modelId: m.id, serial: sn, location: gv('aLoc') || (m.usage === '대여용' ? RENTAL_LOC : ''), position: !isRental(m) ? gv('aPos') : '', status: isRental(m) ? '대여 가능' : '사용 중', note: gv('aNote') });
       }
       changed(`${n}대를 추가했습니다.`);
     }, '추가');
@@ -1892,7 +1933,7 @@ function exportPlan() {
 /* ---------- 엑셀로 장비 추가 (양식 내려받기 / 첨부) ----------
    양식 2종: 장비 등록 양식(장비 1대 = 1줄) / 장비모델 등록 양식(도입 묶음 1개 = 1줄, 대수만큼 장비 자동 생성) */
 const IMPORT_COLS = [ // [머리글, 키, 필수, 열 너비]
-  ['장비종류', 'type', true, 10], ['구분', 'usage', true, 9], ['모델명', 'name', true, 26], ['도입사업명', 'project', false, 28],
+  ['장비종류', 'type', true, 10], ['구분', 'usage', true, 9], ['모델명', 'name', true, 26], ['S/N', 'serial', false, 16], ['도입사업명', 'project', false, 28],
   ['도입일', 'introDate', true, 12], ['사용연한(년)', 'life', true, 11], ['자산번호', 'assetNo', false, 14],
   ['위치·사용부서', 'location', false, 16], ['사용자 직책', 'position', false, 11], ['상태', 'status', false, 10], ['비고', 'note', false, 24],
 ];
@@ -1952,7 +1993,7 @@ const COMMON_FIELDS = [
 function downloadEquipTemplate() {
   const head = IMPORT_COLS.map(c => ({ v: c[0] + (c[2] ? '*' : ''), s: X.header }));
   const sh1 = { name: '장비등록', cols: IMPORT_COLS.map(c => c[3]), rows: [head], freeze: 1,
-    validations: [{ sqref: 'A2:A5000', list: TYPES }, { sqref: 'B2:B5000', list: USAGES }, { sqref: 'J2:J5000', list: ['사용 중', '대여 가능', '불용처리'] }] };
+    validations: [{ sqref: 'A2:A5000', list: TYPES }, { sqref: 'B2:B5000', list: USAGES }, { sqref: 'K2:K5000', list: ['사용 중', '대여 가능', '불용처리'] }] };
   const sh2 = guideSheet({
     title: '장비 등록 양식 작성 안내  (장비 1대 = 1줄)',
     intro: '이 양식은 장비를 한 대씩 등록할 때 씁니다. 자산번호·사용부서·직책까지 한 번에 넣고 싶을 때 쓰세요.\n같은 모델을 대수만 정해 한꺼번에 등록하려면 [장비모델(도입 묶음)] 화면의 “장비모델 등록 양식”이 더 간단합니다.',
@@ -1963,7 +2004,9 @@ function downloadEquipTemplate() {
       '“입력 예시” 시트를 참고하세요. 다 적었으면 Excel 통합 문서(.xlsx)로 저장합니다.',
       '도구의 [② 장비·대여 → 전체 장비 목록 → 📎 엑셀 첨부]로 올립니다. 바로 등록되지 않고 확인 창이 먼저 뜹니다.',
     ],
-    fields: COMMON_FIELDS.concat([
+    fields: COMMON_FIELDS.slice(0, 3).concat([
+      ['S/N', false, '제조사 시리얼 번호 (장비 뒷면·바닥 라벨)', '5CG2341ABC', '장비마다 다른 번호입니다. 같은 파일에 같은 S/N을 두 번 쓰면 그 줄은 등록되지 않고, 이미 도구에 있는 S/N이면 확인 창에서 알려 줍니다. 모르면 비워 두고 나중에 장비 목록에서 고칠 수 있습니다.'],
+    ], COMMON_FIELDS.slice(3), [
       ['자산번호', false, '기관에서 쓰는 자산번호', 'PC26-0101', '비우면 자동으로 붙습니다(예: PC26-0001). 이미 있는 번호나 같은 번호를 두 번 쓰면 그 줄은 등록되지 않습니다. 메모를 적지 마세요.'],
       ['위치·사용부서', false, '장비를 쓰는 부서 이름', '행정과', '적은 이름은 부서 목록에 자동으로 추가됩니다. 부서 이름만 적으세요. 대여용은 비우면 “' + RENTAL_LOC + '”이 됩니다.'],
       ['사용자 직책', false, '장비를 쓰는 사람의 직책', '주무관', '사람 이름은 적지 않습니다. 대여용 장비는 이 칸을 저장하지 않습니다.'],
@@ -1984,10 +2027,10 @@ function downloadEquipTemplate() {
     ],
   });
   const sh3 = exampleSheet(IMPORT_COLS, [
-    ['노트북', '대여용', 'LG 그램 16Z90R', '2026년 노트북 교체사업', '2026-03-15', 5, '', '', '', '', ''],
-    ['노트북', '대여용', 'LG 그램 16Z90R', '2026년 노트북 교체사업', '2026-03-15', 5, '', '', '', '', '충전기 없음'],
-    ['PC', '설치', '삼성 DM500TFA', '2026년 행정 PC 교체사업', '2026-04-01', 6, 'PC26-0101', '행정과', '주무관', '', ''],
-    ['모니터', '재활용', 'LG 24MK600M', '반납 모니터 재배치', '2021-05-10', 7, '', '민원과', '팀장', '', '반납 장비 재배치'],
+    ['노트북', '대여용', 'LG 그램 16Z90R', '503KAXY12345', '2026년 노트북 교체사업', '2026-03-15', 5, '', '', '', '', ''],
+    ['노트북', '대여용', 'LG 그램 16Z90R', '503KAXY12346', '2026년 노트북 교체사업', '2026-03-15', 5, '', '', '', '', '충전기 없음'],
+    ['PC', '설치', '삼성 DM500TFA', '0K7Q93BR600123', '2026년 행정 PC 교체사업', '2026-04-01', 6, 'PC26-0101', '행정과', '주무관', '', ''],
+    ['모니터', '재활용', 'LG 24MK600M', '', '반납 모니터 재배치', '2021-05-10', 7, '', '민원과', '팀장', '', '반납 장비 재배치'],
   ], '※ 예시입니다. 이 시트는 등록되지 않습니다. 실제 내용은 “장비등록” 시트에 적으세요. (위 두 노트북은 같은 장비모델로 묶여 2대가 됩니다)');
   download(buildXlsx([sh1, sh2, sh3, existingModelsSheet()]), `장비등록_양식.xlsx`);
   toast('장비 등록 양식을 내려받았습니다. 작성 후 [📎 엑셀 첨부]로 올려 주세요.');
@@ -2127,16 +2170,20 @@ async function importEquipFile(inp) {
   if (isModel) importModelRows(f, data, rows); else importEquipRows(f, data, rows);
 }
 function importEquipRows(f, data, rows) {
-  const used = new Set(DB.equipment.map(e => e.assetNo)), inFile = new Set();
+  const used = new Set(DB.equipment.map(e => e.assetNo)), inFile = new Set(), snInFile = new Set(), snDup = [];
   const ok = [], errs = [];
   rows.forEach(({ rowNo, raw }) => {
     const { v, e } = readCommon(raw);
+    v.serial = String(raw.serial).trim();
+    const snKey = v.serial.toUpperCase();
+    if (v.serial && snInFile.has(snKey)) e.push(`S/N ${v.serial} 파일 안에서 중복`);
     Object.assign(v, { assetNo: String(raw.assetNo).trim(), location: String(raw.location).trim(), position: String(raw.position).trim(), status: String(raw.status).trim(), note: String(raw.note).trim() });
     if (v.assetNo) { if (used.has(v.assetNo)) e.push(`자산번호 ${v.assetNo} 이미 등록됨`); else if (inFile.has(v.assetNo)) e.push(`자산번호 ${v.assetNo} 파일 안에서 중복`); }
     const okSt = v.usage === '대여용' ? ['대여 가능', '불용처리'] : ['사용 중', '불용처리'];
     if (v.status && !okSt.includes(v.status)) e.push(`상태 "${v.status}" (${okSt.join('/')})`);
     if (e.length) { errs.push({ rowNo, label: `${v.type} ${v.name} ${v.assetNo}`.trim(), msg: e.join(', ') }); return; }
     if (v.assetNo) inFile.add(v.assetNo);
+    if (v.serial) { snInFile.add(snKey); const o = serialOwner(v.serial); if (o) snDup.push(`${v.serial}(${o.assetNo})`); }
     ok.push(v);
   });
   const exist = {}; DB.models.forEach(m => exist[modelKey(m)] = m);
@@ -2151,6 +2198,7 @@ function importEquipRows(f, data, rows) {
       <div class="card"><div class="k">기존 장비모델에 추가</div><div class="v">${toExist}대</div></div>
       <div class="card ${errs.length ? 'red' : ''}"><div class="k">오류 줄 (제외)</div><div class="v">${errs.length}줄</div></div></div>
     ${newDepts.length ? `<div class="warnbox">부서 목록에 없는 위치·사용부서 ${newDepts.length}개가 새 부서로 추가됩니다: <b>${newDepts.slice(0, 15).map(h).join(', ')}${newDepts.length > 15 ? ' …' : ''}</b><br>부서 이름이 아니라면 취소하고 엑셀에서 비고 칸으로 옮기세요.</div>` : ''}
+    ${snDup.length ? `<div class="warnbox">이미 다른 장비에 등록된 S/N이 ${snDup.length}개 있습니다: <b>${snDup.slice(0, 10).map(h).join(', ')}${snDup.length > 10 ? ' …' : ''}</b><br>같은 장비를 두 번 올린 것이 아닌지 확인하세요. 그대로 등록하면 S/N이 겹친 채 저장됩니다.</div>` : ''}
     ${nm.length ? `<h3>새로 만들 장비모델</h3><div class="tablewrap" style="max-height:160px;margin-bottom:10px"><table class="t"><thead><tr><th>종류</th><th>구분</th><th>모델명</th><th>도입사업명</th><th>도입일</th><th class="n">사용연한</th><th class="n">대수</th></tr></thead><tbody>${nm.map(m => `<tr><td>${h(m.type)}</td><td>${h(m.usage)}</td><td>${h(m.name)}</td><td>${h(m.project)}</td><td>${h(m.introDate)}</td><td class="n">${m.life}년</td><td class="n">${m.n}</td></tr>`).join('')}</tbody></table></div>` : ''}
     ${errTable(errs)}
     ${!ok.length ? '<div class="empty">등록할 수 있는 줄이 없습니다.</div>' : ''}`;
@@ -2159,7 +2207,7 @@ function importEquipRows(f, data, rows) {
     const next = assetNumberer(ok);
     ok.forEach(v => {
       const m = exist[modelKey(v)];
-      DB.equipment.push({ assetNo: v.assetNo || next(m), modelId: m.id, location: v.location || (isRental(m) ? RENTAL_LOC : ''), position: isRental(m) ? '' : v.position, status: v.status || (isRental(m) ? '대여 가능' : '사용 중'), note: v.note });
+      DB.equipment.push({ assetNo: v.assetNo || next(m), modelId: m.id, serial: v.serial, location: v.location || (isRental(m) ? RENTAL_LOC : ''), position: isRental(m) ? '' : v.position, status: v.status || (isRental(m) ? '대여 가능' : '사용 중'), note: v.note });
       ensureDept(v.location);
     });
     changed(`엑셀에서 장비 ${ok.length}대를 등록했습니다.${nm.length ? ` (새 장비모델 ${nm.length}개)` : ''}`);
