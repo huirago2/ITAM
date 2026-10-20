@@ -1,0 +1,1963 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>자원관리 도우미</title>
+<style>
+:root{
+  --bg:#f3f5f8;--panel:#fff;--line:#dde2ea;--line2:#eef1f5;--text:#1f2937;--muted:#6b7280;
+  --primary:#1d4ed8;--primary-weak:#e8efff;--navy:#16233b;
+  --red:#c62828;--red-bg:#fdecec;--orange:#b45309;--orange-bg:#fff4e0;--green:#2e7d32;--green-bg:#e8f5e9;--gray-bg:#f1f3f5;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo",sans-serif;font-size:14px;color:var(--text);background:var(--bg)}
+button,input,select{font:inherit}
+header.top{background:var(--navy);color:#fff;position:sticky;top:0;z-index:20;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.toprow{display:flex;align-items:center;gap:12px;padding:10px 20px;flex-wrap:wrap}
+.brand{font-size:18px;font-weight:700;white-space:nowrap}
+.brand small{font-size:12px;font-weight:400;opacity:.7;margin-left:6px}
+.tools{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tools label{font-size:13px;opacity:.9}
+.tools select{padding:4px 6px;border-radius:4px;border:0}
+.fileinfo{font-size:12px;opacity:.85;max-width:420px}
+.dirty{font-size:12px;padding:3px 8px;border-radius:10px;background:#f59e0b;color:#111;font-weight:700}
+.samplebadge{font-size:11px;padding:2px 7px;border-radius:9px;background:#7c3aed;color:#fff;font-weight:700}
+.saved{font-size:12px;padding:3px 8px;border-radius:10px;background:#334155;color:#cbd5e1}
+nav.tabs{display:flex;gap:2px;padding:0 16px}
+nav.tabs button{background:transparent;color:#cbd5e1;border:0;padding:9px 18px;cursor:pointer;border-bottom:3px solid transparent;font-size:14px}
+nav.tabs button.on{color:#fff;border-bottom-color:#60a5fa;font-weight:700}
+nav.tabs button:hover{color:#fff}
+.tbtn{background:#2b3d5f;color:#fff;border:1px solid #3f5580;padding:5px 12px;border-radius:4px;cursor:pointer}
+.tbtn:hover{background:#344a73}
+.tbtn.primary{background:#2563eb;border-color:#2563eb}
+main{padding:18px 20px 60px;max-width:1500px;margin:0 auto}
+h2{font-size:18px;margin:4px 0 14px}
+h3{font-size:15px;margin:0 0 10px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:16px}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:1fr 1fr}
+@media(max-width:1000px){.g2{grid-template-columns:1fr}}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.card .k{font-size:12px;color:var(--muted)}
+.card .v{font-size:24px;font-weight:700;margin-top:4px}
+.card.red .v{color:var(--red)} .card.orange .v{color:var(--orange)} .card.green .v{color:var(--green)}
+.banner{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--primary-weak);border:1px solid #bcd0ff;border-radius:8px;padding:12px 16px;margin-bottom:16px}
+.banner.ok{background:var(--green-bg);border-color:#b7dfb9}
+.alert{display:flex;gap:10px;align-items:center;padding:9px 12px;border-radius:6px;margin-bottom:6px;cursor:pointer;border:1px solid transparent;flex-wrap:wrap}
+.alert:hover{filter:brightness(.97);border-color:rgba(0,0,0,.08)}
+.alert.red{background:var(--red-bg);color:#7f1d1d}
+.alert.orange{background:var(--orange-bg);color:#78350f}
+.alert .tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:9px;color:#fff;white-space:nowrap}
+.alert.red .tag{background:var(--red)} .alert.orange .tag{background:var(--orange)}
+.empty{color:var(--muted);padding:8px 2px;font-size:13px}
+.subtabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.subtabs button{border:1px solid var(--line);background:#fff;padding:7px 14px;border-radius:18px;cursor:pointer}
+.subtabs button.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.filters label{font-size:13px;color:var(--muted)}
+.filters input,.filters select{padding:5px 8px;border:1px solid var(--line);border-radius:4px;background:#fff}
+.spacer{flex:1}
+.btn{border:1px solid var(--line);background:#fff;padding:5px 12px;border-radius:4px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--gray-bg)}
+.btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+.btn.primary:hover{background:#1e40af}
+.btn.danger{color:var(--red);border-color:#f3b4b4}
+.btn.sm{padding:2px 8px;font-size:12px}
+table.t{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
+table.t th{background:#f5f7fa;border-bottom:2px solid var(--line);padding:7px 8px;text-align:left;font-weight:700;white-space:nowrap;position:sticky;top:0}
+table.t td{border-bottom:1px solid var(--line2);padding:6px 8px;vertical-align:middle}
+table.t tr:hover td{background:#fafbfd}
+table.t th.sortable{cursor:pointer;user-select:none}
+table.t th.sortable:hover{background:#e8eef8}
+.sarrow{margin-left:4px;font-size:10px;color:#b0b7c3}
+.sarrow.on{color:var(--primary);font-size:11px}
+table.t td.n,table.t th.n{text-align:right;font-variant-numeric:tabular-nums}
+table.t td.c,table.t th.c{text-align:center}
+table.t tr.sub td{background:#f3f5f9;font-weight:700}
+table.t tr.total td{background:#e6edfb;font-weight:700}
+table.t tr.rowred td{background:#fff5f5}
+table.t tr.rowshort td{background:#fff8ec}
+table.t input[type=number]{width:80px;padding:3px 6px;border:1px solid #c9d2e0;border-radius:4px;text-align:right}
+.tablewrap{overflow:auto;max-height:640px;border:1px solid var(--line);border-radius:6px}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:9px;white-space:nowrap}
+.b-green{background:var(--green-bg);color:var(--green)}
+.b-blue{background:var(--primary-weak);color:var(--primary)}
+.b-gray{background:#e5e7eb;color:#4b5563}
+.b-red{background:var(--red-bg);color:var(--red)}
+.b-orange{background:var(--orange-bg);color:var(--orange)}
+.txt-red{color:var(--red);font-weight:700}
+.txt-orange{color:var(--orange);font-weight:700}
+.muted{color:var(--muted);font-size:12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);border-radius:6px;padding:7px 12px;background:#fff;font-size:13px}
+.chip b{font-size:17px;color:var(--primary)}
+.chip.zero b{color:var(--muted)}
+.chip .tp{color:var(--muted);font-size:12px;margin-right:4px}
+.pager{display:flex;gap:6px;align-items:center;justify-content:flex-end;margin-top:8px;font-size:13px}
+.flash td,.flash.alert,div.flash{animation:flash 2.2s ease-out}
+@keyframes flash{0%,40%{background:#fde68a}100%{}}
+.sumbar{display:flex;gap:18px;flex-wrap:wrap;justify-content:flex-end;padding:12px 4px 0;font-size:15px}
+.sumbar b{font-size:18px}
+.over{color:var(--red)}
+.modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:flex-start;justify-content:center;z-index:50;padding-top:7vh}
+.modal-bg.hidden{display:none}
+.modal{background:#fff;border-radius:10px;width:520px;max-width:94vw;max-height:86vh;overflow:auto;padding:20px 22px;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.modal.wide{width:960px}
+.dirty,.saved{cursor:pointer}
+.dirty:hover{background:#fbbf24}
+.chg-add{background:var(--green-bg);color:var(--green)} .chg-mod{background:var(--primary-weak);color:var(--primary)} .chg-del{background:var(--red-bg);color:var(--red)}
+.chgdet{font-size:12px;color:#374151;line-height:1.6}
+.chgdet s{color:#9ca3af}
+.modal h3{font-size:17px;margin-bottom:14px}
+.frow{display:grid;grid-template-columns:120px 1fr;align-items:center;gap:8px;margin-bottom:10px}
+.frow label{font-size:13px;color:#374151}
+.frow input,.frow select,.frow textarea{padding:6px 8px;border:1px solid #c9d2e0;border-radius:4px;width:100%}
+.req{color:var(--red)}
+.mfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.mfoot .left{margin-right:auto}
+.err{color:var(--red);font-size:13px;min-height:18px;margin-top:4px;white-space:pre-line}
+.hint{font-size:12px;color:var(--muted);margin:-4px 0 10px 128px}
+.warnbox{background:var(--orange-bg);color:#78350f;border-radius:6px;padding:8px 10px;font-size:13px;margin-bottom:10px}
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 18px;border-radius:6px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:60}
+#toast.show{opacity:.95}
+.kv{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:#374151;margin-bottom:10px}
+.kv b{color:var(--text)}
+@media print{header.top,.filters,.subtabs,.btn{display:none!important}.tablewrap{max-height:none;overflow:visible}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="toprow">
+    <div class="brand">자원관리 도우미<small>정보통신지원센터</small></div>
+    <div class="tools">
+      <label>작업자
+        <select id="worker" onchange="setWorker(this.value)">
+          <option value="정">정 담당자</option>
+          <option value="부">부 담당자</option>
+        </select>
+      </label>
+      <span class="fileinfo" id="fileinfo"></span>
+      <span id="dirtyBadge"></span>
+      <button class="tbtn primary" onclick="saveFile()" title="현재 데이터를 JSON 파일로 저장">💾 저장</button>
+      <button class="tbtn" onclick="loadClick()" title="데이터 파일(JSON) 불러오기">📂 불러오기</button>
+      <button class="tbtn" onclick="startEmpty()" title="샘플 없이 실제 데이터를 처음부터 입력">빈 데이터로 시작</button>
+      <button class="tbtn" onclick="resetSample()">샘플 데이터 초기화</button>
+      <input type="file" id="fileInput" accept=".json,application/json" style="display:none" onchange="loadFile(this)">
+    </div>
+  </div>
+  <nav class="tabs" id="nav"></nav>
+</header>
+<main id="main"></main>
+
+<div id="modalBg" class="modal-bg hidden">
+  <div class="modal">
+    <h3 id="mTitle"></h3>
+    <div id="mBody"></div>
+    <div class="err" id="mErr"></div>
+    <div class="mfoot" id="mFoot"></div>
+  </div>
+</div>
+<datalist id="dlDept"></datalist>
+<datalist id="dlPos"></datalist>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   상수
+   ===================================================================== */
+const APP_VERSION = 1;
+const TYPES = ['노트북', 'PC', '모니터', '프린터'];
+const USAGES = ['대여용', '설치'];
+const EQ_STATUS = ['사용 중', '대여 가능', '대여 중', '불용처리'];
+const CS_KINDS = ['잉크', '토너', '헤드', '유지보수키트'];
+const LIFE_ST = ['정상', '구매 소요 확정 대상', '불용 대상'];
+const WLABEL = { 정: '정 담당자', 부: '부 담당자' };
+const DEPTS = ['행정과', '기획예산과', '민원과', '총무과', '재무과', '감사실', '정보통신과', '시설관리과', '복지정책과', '교육지원과', '안전관리과', '홍보담당관'];
+const POSITIONS = ['주무관', '팀장', '과장', '계장', '실장'];
+const RENTAL_LOC = '정보통신지원센터(대여 보관)';
+const PAGE = 100;
+
+/* =====================================================================
+   유틸
+   ===================================================================== */
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const pd = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const TODAY = () => ymd(new Date());
+function addDays(s, n) { const d = pd(s); d.setDate(d.getDate() + n); return ymd(d); }
+function addMonths(s, n) {
+  const d = pd(s), day = d.getDate();
+  d.setDate(1); d.setMonth(d.getMonth() + n);
+  const dim = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(day, dim)); return ymd(d);
+}
+const addYears = (s, n) => addMonths(s, n * 12);
+const diffDays = (a, b) => Math.round((pd(b) - pd(a)) / 86400000); // b - a
+const qOf = s => Math.floor(pd(s).getMonth() / 3) + 1;
+const qStart = (y, q) => `${y}-${pad((q - 1) * 3 + 1)}-01`;
+const qEnd = (y, q) => ymd(new Date(y, q * 3, 0));
+const cmp = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+const fmtN = n => (Math.round(Number(n) || 0)).toLocaleString('ko-KR');
+const fmt1 = n => (Math.round(n * 10) / 10).toLocaleString('ko-KR');
+function fmtDT(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${ymd(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function h(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+const ja = s => h(JSON.stringify(String(s))); // onclick 인자용
+let _uidc = 0;
+const uid = p => p + Date.now().toString(36) + (++_uidc).toString(36) + Math.floor(Math.random() * 1296).toString(36);
+function toast(msg) {
+  const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2600);
+}
+function download(blob, name) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+function stamp(d = new Date()) { return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`; }
+function monthsElapsed(ref) { // 1월 1일부터 ref까지 경과 개월(소수)
+  const d = pd(ref); const dim = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  return d.getMonth() + d.getDate() / dim;
+}
+
+/* =====================================================================
+   상태
+   ===================================================================== */
+let DB = null;          // 전체 데이터
+let dirty = false;      // 파일로 저장하지 않은 변경 여부
+let loadedName = null;  // 불러온/저장한 파일명
+let worker = '정';
+let MM = {};            // 모델ID → 모델
+let LOAN_BY_ASSET = {}; // 자산번호 → 진행 중 대여
+const S = {
+  screen: 'home', eqTab: 'rental',
+  rf: { type: '', status: '' },
+  af: { q: '', type: '', usage: '', status: '', life: '' }, aPage: 0,
+  tsort: {}, // 표 정렬 상태: 표 키 → { col, dir }
+  wf: { year: '', kind: '' }, wPage: 0,
+  hf: { asset: '', dept: '', status: '' },
+  csTab: 'stock', lf: { kind: '', cid: '', year: '' }, lPage: 0,
+  cmpYear: null, pq: null,
+  rp: null, highlight: null,
+};
+
+function buildIndex() {
+  MM = {}; DB.models.forEach(m => MM[m.id] = m);
+  LOAN_BY_ASSET = {}; DB.loans.forEach(l => { if (!l.returnDate) LOAN_BY_ASSET[l.assetNo] = l; });
+}
+function expiry(m) { return addYears(m.introDate, Number(m.life) || 0); }
+function lifeStatus(m, base) {
+  const ex = expiry(m);
+  if (base > ex) return '불용 대상';
+  if (ex <= addYears(base, 1)) return '구매 소요 확정 대상';
+  return '정상';
+}
+function lifeBadge(st) {
+  return st === '불용 대상' ? `<span class="badge b-red">불용 대상</span>`
+    : st === '구매 소요 확정 대상' ? `<span class="badge b-orange">구매 소요 확정 대상</span>`
+      : `<span class="badge b-green">정상</span>`;
+}
+function eqBadge(st) {
+  const c = { '사용 중': 'b-blue', '대여 가능': 'b-green', '대여 중': 'b-orange', '불용처리': 'b-gray' }[st] || 'b-gray';
+  return `<span class="badge ${c}">${h(st)}</span>`;
+}
+function locOf(e) { const l = LOAN_BY_ASSET[e.assetNo]; return l ? `${l.dept} (대여 중)` : e.location; }
+function posOf(e) { const l = LOAN_BY_ASSET[e.assetNo]; return l ? l.position : (e.position || ''); }
+function sortEquip(a, b) {
+  const ma = MM[a.modelId], mb = MM[b.modelId];
+  return TYPES.indexOf(ma.type) - TYPES.indexOf(mb.type) || cmp(ma.introDate, mb.introDate) || cmp(ma.name, mb.name) || cmp(a.assetNo, b.assetNo);
+}
+function modelLabel(m) { return `${m.type} · ${m.name} (${m.introDate.slice(0, 4)} 도입)`; }
+
+/* ---------- 저장/복원 ---------- */
+function persist() {
+  try { localStorage.setItem('rmh.work', JSON.stringify({ data: DB, dirty, loadedName })); } catch (e) { }
+}
+function changed(msg) { dirty = true; persist(); render(); if (msg) toast(msg); }
+function setWorker(v) { worker = v; try { localStorage.setItem('rmh.worker', v); } catch (e) { } }
+
+function normalize(d) {
+  d.models = d.models || []; d.equipment = d.equipment || []; d.loans = d.loans || [];
+  d.consumables = d.consumables || []; d.stockLogs = d.stockLogs || []; d.wasteLogs = d.wasteLogs || [];
+  d.settings = d.settings || {};
+  d.settings.budgets = d.settings.budgets || {};
+  d.settings.reportExports = d.settings.reportExports || {};
+  d.settings.purchasePlans = d.settings.purchasePlans || {};
+  d.settings.fileInfo = d.settings.fileInfo || null;
+  if (!Array.isArray(d.settings.depts)) { // 예전 파일: 기본 부서 + 기록에 쓰인 부서명으로 목록 생성
+    const s = new Set(DEPTS);
+    d.loans.forEach(l => l.dept && s.add(l.dept)); d.stockLogs.forEach(l => l.dept && s.add(l.dept)); d.wasteLogs.forEach(l => l.dept && s.add(l.dept));
+    d.equipment.forEach(e => e.location && e.location !== RENTAL_LOC && s.add(e.location));
+    d.settings.depts = [...s];
+  }
+  d.version = d.version || APP_VERSION;
+  return d;
+}
+
+function saveFile() {
+  const now = new Date();
+  DB.settings.fileInfo = { savedAt: now.toISOString(), savedBy: worker };
+  const name = `자원관리_${stamp(now)}.json`;
+  download(new Blob([JSON.stringify(DB)], { type: 'application/json' }), name);
+  loadedName = name; dirty = false; persist(); setBaseline(); render();
+  toast(`${name} 파일로 저장했습니다. 공유 폴더에 올려 주세요.`);
+}
+function loadClick() {
+  if (dirty && !confirm('저장하지 않은 변경 사항이 있습니다.\n다른 파일을 불러오면 현재 변경 내용이 사라집니다. 계속할까요?')) return;
+  document.getElementById('fileInput').click();
+}
+function loadFile(inp) {
+  const f = inp.files[0]; inp.value = '';
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const d = JSON.parse(r.result);
+      if (!d || !Array.isArray(d.models) || !Array.isArray(d.equipment)) throw new Error('자원관리 도우미 데이터 파일이 아닙니다.');
+      DB = normalize(d); loadedName = f.name; dirty = false; persist(); setBaseline();
+      S.screen = 'home'; render();
+      const fi = DB.settings.fileInfo;
+      toast(`불러왔습니다: ${f.name}` + (fi ? ` (저장 ${fmtDT(fi.savedAt)}, ${WLABEL[fi.savedBy] || ''})` : ''));
+    } catch (e) { alert('파일을 불러오지 못했습니다.\n' + e.message); }
+  };
+  r.readAsText(f, 'utf-8');
+}
+function resetSample() {
+  if (DB.settings.dataKind !== 'sample' && (DB.models.length || DB.consumables.length)) {
+    // 실제 데이터를 쓰는 중이면 실수 방지를 위해 직접 입력을 요구
+    const a = prompt('⚠ 지금은 샘플이 아닌 실제 데이터입니다.\n샘플로 초기화하면 화면의 데이터가 모두 샘플로 바뀝니다.' + (dirty ? '\n※ 저장하지 않은 변경 사항도 사라집니다!' : '') + '\n\n계속하려면 "샘플" 이라고 입력하세요.');
+    if (a == null) return;
+    if (a.trim() !== '샘플') { alert('입력이 맞지 않아 취소했습니다.'); return; }
+  } else if (!confirm('샘플 데이터로 초기화할까요?\n현재 화면의 데이터는 모두 샘플 데이터로 바뀝니다.' + (dirty ? '\n\n※ 저장하지 않은 변경 사항이 있습니다!' : ''))) return;
+  DB = makeSample(); loadedName = null; dirty = false; persist(); setBaseline(); S.screen = 'home'; S.tsort = {}; render();
+  toast('샘플 데이터로 초기화했습니다.');
+}
+function emptyData(depts) {
+  return normalize({
+    version: APP_VERSION, models: [], equipment: [], loans: [], consumables: [], stockLogs: [], wasteLogs: [],
+    settings: { budgets: {}, reportExports: {}, purchasePlans: {}, fileInfo: null, depts: depts.slice(), dataKind: 'real' }
+  });
+}
+function startEmpty() {
+  const hasReal = DB.settings.dataKind !== 'sample' && (DB.models.length || DB.consumables.length);
+  const msg = '빈 데이터로 시작할까요?\n\n장비모델·장비·대여 기록·소모품·입출고·폐토너 기록·예산·보고 이력이 모두 비워집니다.\n부서 목록과 작업자 선택은 그대로 유지됩니다.'
+    + (hasReal ? '\n\n⚠ 지금은 실제 데이터입니다. 필요하면 먼저 [저장]으로 백업하세요.' : '')
+    + (dirty ? '\n\n※ 저장하지 않은 변경 사항이 있습니다!' : '');
+  if (!confirm(msg)) return;
+  DB = emptyData(DB.settings.depts); loadedName = null; dirty = true; persist(); setBaseline('new');
+  S.screen = 'home'; S.tsort = {}; S.rp = null; S.pq = null; render();
+  toast('빈 데이터로 시작합니다. 장비모델부터 등록하세요.');
+}
+/* ---------- 저장 안 한 변경 내역 ----------
+   마지막으로 저장·불러오기 한 시점의 데이터(BASE)와 지금 데이터를 비교해 보여준다. */
+let BASE = null, BASE_MODE = 'file'; // mode: file(저장·불러오기 기준) | new(빈 데이터로 새로 시작) | unknown(이전 세션 기준 없음)
+function setBaseline(mode = 'file') {
+  BASE = JSON.parse(JSON.stringify(DB)); BASE_MODE = mode;
+  try { localStorage.setItem('rmh.base', JSON.stringify({ data: BASE, mode })); } catch (e) { }
+}
+function anyModel(id) { return MM[id] || (BASE && BASE.models.find(x => x.id === id)); }
+function csName(id) { const c = DB.consumables.find(x => x.id === id) || (BASE && BASE.consumables.find(x => x.id === id)); return c ? c.name : '(삭제된 소모품)'; }
+function fmtField(f, v) {
+  if (v == null || v === '') return '(없음)';
+  if (f === 'modelId') { const m = anyModel(v); return m ? `${m.name} (${m.project || '-'})` : v; }
+  if (f === 'consumableId') return csName(v);
+  if (['loanChecker', 'returnChecker', 'handler'].includes(f)) return WLABEL[v] || v;
+  if (f === 'price') return fmtN(v) + '원';
+  return String(v);
+}
+const DIFF_DEF = [
+  { k: 'models', key: 'id', label: '장비모델', name: m => `${m.type} · ${m.name} (${m.project || '-'})`, f: { type: '장비종류', usage: '구분', name: '모델명', project: '도입사업명', introDate: '도입일', life: '사용연한(년)' } },
+  { k: 'equipment', key: 'assetNo', label: '장비', name: e => { const m = anyModel(e.modelId); return `${e.assetNo}${m ? ` · ${m.type} ${m.name}` : ''}`; }, f: { modelId: '모델', location: '위치·사용부서', position: '사용자 직책', status: '상태', note: '비고' } },
+  { k: 'loans', key: 'id', label: '대여', name: l => `${l.assetNo} · ${l.dept} ${l.position} (공문 ${l.docNo})`, f: { assetNo: '자산번호', dept: '대여 부서', position: '직책', docNo: '공문번호', loanDate: '대여일', dueDate: '반납예정일', loanChecker: '대여 확인자', returnDate: '실제 반납일', returnChecker: '반납 확인자' } },
+  { k: 'consumables', key: 'id', label: '소모품', name: c => `${c.printerModel} · ${c.name}`, f: { printerModel: '프린터 모델', kind: '종류', name: '품명', price: '단가', initialStock: '최초 재고', registeredDate: '등록일' } },
+  { k: 'stockLogs', key: 'id', label: '입출고', name: l => `${l.date} ${l.kind} · ${csName(l.consumableId)} ${l.qty}개${l.dept ? ` (${l.dept})` : ''}`, f: { date: '일자', kind: '구분', consumableId: '소모품', qty: '수량', dept: '수령부서', handler: '담당자', returnQty: '폐토너 반납', note: '비고' } },
+  { k: 'wasteLogs', key: 'id', label: '폐토너', name: w => `${w.date} ${w.kind === '처리' ? '처리(반출)' : '추가 회수'} · ${csName(w.consumableId)} ${w.qty}개${w.dept ? ` (${w.dept})` : w.vendor ? ` (${w.vendor})` : ''}`, f: { date: '일자', consumableId: '토너', qty: '수량', dept: '부서', vendor: '처리처', handler: '담당자', note: '비고' } },
+];
+function computeChanges() {
+  const out = [];
+  if (!BASE) return out;
+  DIFF_DEF.forEach(d => {
+    const a = new Map((BASE[d.k] || []).map(x => [x[d.key], x])), b = new Map((DB[d.k] || []).map(x => [x[d.key], x]));
+    b.forEach((x, id) => {
+      const o = a.get(id);
+      if (!o) { out.push({ cat: d.label, type: '추가', name: d.name(x), details: [] }); return; }
+      if (JSON.stringify(o) === JSON.stringify(x)) return;
+      const det = Object.keys(d.f).filter(f => String(o[f] == null ? '' : o[f]) !== String(x[f] == null ? '' : x[f])).map(f => ({ f: d.f[f], from: fmtField(f, o[f]), to: fmtField(f, x[f]) }));
+      if (det.length) out.push({ cat: d.label, type: '수정', name: d.name(x), details: det });
+    });
+    a.forEach((o, id) => { if (!b.has(id)) out.push({ cat: d.label, type: '삭제', name: d.name(o), details: [] }); });
+  });
+  const bs = BASE.settings || {}, s = DB.settings;
+  const bd = new Set(bs.depts || []), nd = new Set(s.depts || []);
+  nd.forEach(x => { if (!bd.has(x)) out.push({ cat: '부서', type: '추가', name: x, details: [] }); });
+  bd.forEach(x => { if (!nd.has(x)) out.push({ cat: '부서', type: '삭제', name: x, details: [] }); });
+  const qLabel = k => { const [y, q] = k.split('-'); return `${y}년 ${q}분기`; };
+  new Set([...Object.keys(bs.budgets || {}), ...Object.keys(s.budgets || {})]).forEach(k => {
+    const o = (bs.budgets || {})[k], n = s.budgets[k];
+    if (Number(o || 0) !== Number(n || 0)) out.push({ cat: '예산', type: o == null ? '추가' : '수정', name: `${qLabel(k)} 소모품 예산`, details: [{ f: '예산', from: o == null ? '(없음)' : fmtN(o) + '원', to: fmtN(n) + '원' }] });
+  });
+  new Set([...Object.keys(bs.purchasePlans || {}), ...Object.keys(s.purchasePlans || {})]).forEach(k => {
+    const o = (bs.purchasePlans || {})[k] || {}, n = s.purchasePlans[k] || {};
+    new Set([...Object.keys(o), ...Object.keys(n)]).forEach(cid => {
+      if (o[cid] !== n[cid]) out.push({ cat: '구매 소요', type: '수정', name: `${qLabel(k)} · ${csName(cid)}`, details: [{ f: '확정 수량', from: o[cid] == null ? '제안값' : String(o[cid]), to: n[cid] == null ? '제안값' : String(n[cid]) }] });
+    });
+  });
+  Object.keys(s.reportExports || {}).forEach(k => {
+    if ((bs.reportExports || {})[k] !== s.reportExports[k]) out.push({ cat: '분기 보고', type: '기록', name: `${qLabel(k)} 장비 보고 엑셀 내보냄`, details: [{ f: '내보낸 일시', from: (bs.reportExports || {})[k] ? fmtDT(bs.reportExports[k]) : '(없음)', to: fmtDT(s.reportExports[k]) }] });
+  });
+  return out;
+}
+function showChanges() {
+  buildIndex();
+  const ch = computeChanges();
+  const fi = BASE && BASE.settings && BASE.settings.fileInfo;
+  const baseTxt = BASE_MODE === 'new' ? '빈 데이터로 새로 시작한 시점'
+    : BASE_MODE === 'unknown' ? '이 브라우저를 다시 연 시점 (그 전의 변경 내역은 기록이 없어 볼 수 없습니다)'
+      : loadedName ? `${loadedName}${fi ? ` (저장 ${fmtDT(fi.savedAt)} · ${WLABEL[fi.savedBy] || ''})` : ''}` : (DB.settings.dataKind === 'sample' ? '샘플 데이터를 처음 만든 시점' : '마지막 저장·불러오기 시점');
+  const cats = [...new Set(ch.map(c => c.cat))];
+  const badge = t => `<span class="badge ${t === '추가' ? 'chg-add' : t === '삭제' ? 'chg-del' : 'chg-mod'}">${t}</span>`;
+  const LIMIT = 100;
+  const summary = cats.map(c => { const xs = ch.filter(x => x.cat === c); const n = t => xs.filter(x => x.type === t).length; return `<div class="chip"><b>${xs.length}</b> ${h(c)} <span class="muted">${['추가', '수정', '삭제', '기록'].filter(t => n(t)).map(t => `${t} ${n(t)}`).join(' · ')}</span></div>`; }).join('');
+  const rows = cats.map(c => {
+    const xs = ch.filter(x => x.cat === c);
+    return xs.slice(0, LIMIT).map(x => `<tr><td>${h(x.cat)}</td><td class="c">${badge(x.type)}</td><td>${h(x.name)}</td><td class="chgdet">${x.details.map(d => `${h(d.f)}: <s>${h(d.from)}</s> → <b>${h(d.to)}</b>`).join('<br>')}</td></tr>`).join('')
+      + (xs.length > LIMIT ? `<tr><td colspan="4" class="muted">… ${h(c)} 외 ${xs.length - LIMIT}건 더 있음</td></tr>` : '');
+  }).join('');
+  let body = `<div class="kv"><span>비교 기준: <b>${h(baseTxt)}</b></span></div>`;
+  if (ch.length) body += `<div class="chips" style="margin-bottom:10px">${summary}</div>
+    <div class="tablewrap" style="max-height:52vh"><table class="t"><thead><tr><th>분류</th><th class="c">변경</th><th>대상</th><th>변경 내용</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  else if (dirty && BASE_MODE === 'new') body += `<div class="empty">빈 데이터로 새로 시작한 뒤 아직 입력한 내용이 없습니다. 이 상태도 아직 파일로 저장되지 않았습니다.</div>`;
+  else if (dirty && BASE_MODE === 'unknown') body += `<div class="empty">이 브라우저를 다시 연 뒤에는 바뀐 내용이 없습니다. 그 전에 저장하지 않은 변경이 남아 있을 수 있으니 저장해 두세요.</div>`;
+  else if (dirty) body += `<div class="empty">바뀐 내용이 모두 원래대로 돌아가 차이가 없습니다.</div>`;
+  else body += `<div class="empty">마지막 저장·불러오기 뒤에 바뀐 내용이 없습니다.</div>`;
+  body += `<div class="muted" style="margin-top:8px">※ 💾 저장하면 이 내역이 파일에 반영되고 목록이 비워집니다. 현재 재고 같은 계산 값은 기록 변경에 따라 자동으로 바뀌므로 따로 표시하지 않습니다.</div>`;
+  openModal(`저장 안 한 변경 내역${ch.length ? ` (${ch.length}건)` : ''}`, body, dirty ? () => { saveFile(); } : null, '💾 지금 저장', [], { wide: true, cancelLabel: '닫기' });
+}
+window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+/* =====================================================================
+   샘플 데이터
+   ===================================================================== */
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+function makeSample() {
+  const rnd = mulberry32(20261019);
+  const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
+  const pick = a => a[Math.floor(rnd() * a.length)];
+  const t = TODAY(), Y = pd(t).getFullYear();
+  const models = [], equipment = [], loans = [], consumables = [], stockLogs = [];
+  const seq = { 노트북: 0, PC: 0, 모니터: 0, 프린터: 0 }, PFX = { 노트북: 'NB', PC: 'PC', 모니터: 'MN', 프린터: 'PR' };
+  let mid = 0;
+  const instPos = ['주무관', '주무관', '주무관', '주무관', '팀장', '과장'];
+
+  // spec: {exp: 오늘 기준 만료까지 일수} | {ago: 도입 후 경과 개월} | {expAt: 만료일}
+  function M(type, usage, name, project, spec, life, count, disposed = 0) {
+    let intro;
+    if (spec.exp !== undefined) intro = addYears(addDays(t, spec.exp), -life);
+    else if (spec.expAt) intro = addYears(spec.expAt, -life);
+    else intro = addMonths(t, -spec.ago);
+    const m = { id: 'M' + pad(++mid).padStart(3, '0'), type, usage, name, project: `${intro.slice(0, 4)}년 ${project}`, introDate: intro, life };
+    models.push(m);
+    for (let i = 0; i < count; i++) {
+      seq[type]++;
+      const assetNo = `${PFX[type]}${intro.slice(2, 4)}-${String(seq[type]).padStart(4, '0')}`;
+      const st = i < disposed ? '불용처리' : (usage === '대여용' ? '대여 가능' : '사용 중');
+      if (usage === '대여용') equipment.push({ assetNo, modelId: m.id, location: RENTAL_LOC, position: '', status: st, note: st === '불용처리' ? '불용 처리 완료' : '' });
+      else equipment.push({ assetNo, modelId: m.id, location: pick(DEPTS), position: pick(instPos), status: st, note: st === '불용처리' ? '불용 처리 완료' : '' });
+    }
+    return m;
+  }
+  // ---- 대여용 ----
+  M('노트북', '대여용', 'LG 그램 15Z90P', '업무용 노트북 도입사업', { exp: -210 }, 5, 5, 2);
+  M('노트북', '대여용', '삼성 갤럭시북 NT550XDA', '비대면 업무환경 구축사업', { exp: 140 }, 5, 5);
+  M('노트북', '대여용', 'LG 그램 16Z90R', '노트북 교체사업', { ago: 26 }, 5, 6);
+  M('노트북', '대여용', '삼성 갤럭시북4 Pro NT940XGK', '대여장비 확충사업', { ago: 8 }, 5, 4);
+  M('PC', '대여용', '삼성 DM500TCA', '대여용 PC 도입사업', { exp: -120 }, 6, 7, 3);
+  M('PC', '대여용', 'LG Z70EV', '교육장 PC 구축사업', { exp: 200 }, 6, 6);
+  M('PC', '대여용', 'HP ProDesk 400 G7', '대여용 PC 보강사업', { ago: 40 }, 6, 7);
+  M('PC', '대여용', '레노버 ThinkCentre M70s', '교육장 PC 증설사업', { ago: 30 }, 6, 7);
+  M('PC', '대여용', '삼성 DM500TFA', '대여장비 확충사업', { ago: 18 }, 6, 6);
+  M('PC', '대여용', '델 OptiPlex 7010', '대여장비 확충사업', { ago: 6 }, 6, 7);
+  M('모니터', '대여용', 'LG 24MK430H', '대여용 모니터 도입사업', { exp: 250 }, 7, 30);
+  M('모니터', '대여용', '삼성 S24R350', '교육장 모니터 교체사업', { ago: 55 }, 7, 25);
+  M('모니터', '대여용', 'LG 27MP500', '대여장비 확충사업', { ago: 30 }, 7, 25);
+  M('모니터', '대여용', '삼성 S27C360', '대여장비 확충사업', { ago: 10 }, 7, 20);
+  M('프린터', '대여용', 'HP LaserJet Pro M404dn', '대여용 프린터 도입사업', { ago: 40 }, 6, 4);
+  M('프린터', '대여용', 'Epson L6290', '대여장비 확충사업', { ago: 20 }, 6, 4);
+  // ---- 설치 ----
+  M('PC', '설치', '삼성 DM500TCA', '행정 PC 일괄교체사업', { exp: -90 }, 6, 90, 60);
+  M('PC', '설치', 'LG Z80EV', '행정 PC 교체 1차사업', { exp: 75 }, 6, 80);
+  M('PC', '설치', '삼성 DM500TDA', '행정 PC 교체 2차사업', { exp: 300 }, 6, 75);
+  M('PC', '설치', 'HP ProDesk 400 G7', '민원 PC 교체사업', { ago: 50 }, 6, 70);
+  M('PC', '설치', '레노버 ThinkCentre M70t', '행정 PC 교체 3차사업', { ago: 40 }, 6, 85);
+  M('PC', '설치', '삼성 DM500TEA', '행정 PC 교체 4차사업', { ago: 28 }, 6, 70);
+  M('PC', '설치', 'LG B80HV', '행정 PC 교체 5차사업', { ago: 16 }, 6, 65);
+  M('PC', '설치', '델 OptiPlex 7010', '행정 PC 교체 6차사업', { ago: 5 }, 6, 65);
+  M('모니터', '설치', 'LG 22MK430H', '모니터 일괄교체사업', { exp: -150 }, 7, 180, 120);
+  M('모니터', '설치', '삼성 S24F350', '모니터 교체 1차사업', { exp: 100 }, 7, 160);
+  M('모니터', '설치', 'LG 24MK600M', '모니터 교체 2차사업', { ago: 70 }, 7, 150);
+  M('모니터', '설치', '삼성 S24R350', '모니터 교체 3차사업', { ago: 60 }, 7, 140);
+  M('모니터', '설치', 'LG 24MP400', '모니터 교체 4차사업', { ago: 44 }, 7, 170);
+  M('모니터', '설치', '삼성 S24C310', '모니터 교체 5차사업', { ago: 30 }, 7, 150);
+  M('모니터', '설치', 'LG 27MP500', '모니터 교체 6차사업', { ago: 20 }, 7, 130);
+  M('모니터', '설치', '삼성 S27C360', '모니터 교체 7차사업', { ago: 6 }, 7, 120);
+  const yearEndSoon = (() => { const a = addDays(t, 3), b = `${Y}-12-11`; return a > b ? a : b; })();
+  M('프린터', '설치', 'HP LaserJet Pro M404dn', '프린터 교체 1차사업', { expAt: yearEndSoon }, 6, 20);
+  M('프린터', '설치', 'HP LaserJet Pro M404dn', '프린터 교체 2차사업', { ago: 42 }, 6, 40);
+  M('프린터', '설치', '삼성 SL-X4300LX', '컬러 복합기 도입사업', { ago: 52 }, 6, 25);
+  M('프린터', '설치', '캐논 iR-ADV DX C3826', '복합기 교체사업', { ago: 22 }, 6, 30);
+  M('프린터', '설치', 'Epson L15160', '잉크젯 복합기 도입사업', { ago: 36 }, 6, 20);
+  M('프린터', '설치', '신도리코 D420', '복합기 도입사업', { exp: -30 }, 6, 15);
+
+  // ---- 대여 기록 ----
+  const mOf = e => models.find(m => m.id === e.modelId);
+  const rentable = equipment.filter(e => e.status === '대여 가능' && mOf(e).usage === '대여용' && lifeStatus(mOf(e), t) !== '불용 대상')
+    .map(e => [rnd(), e]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
+  const laptops = rentable.filter(e => mOf(e).type === '노트북');
+  const pcs = rentable.filter(e => mOf(e).type === 'PC');
+  const mons = rentable.filter(e => mOf(e).type === '모니터');
+  const doc = d => `${d}-${ri(1000, 9999)}`;
+  const activeSpec = [[-40, -12, laptops], [-25, -4, laptops], [-20, 3, laptops], [-10, 6, pcs], [-15, 25, laptops], [-7, 40, laptops], [-30, 30, laptops], [-3, 60, pcs], [-12, 45, mons], [-5, 20, laptops]];
+  const used = new Set();
+  let ln = 0;
+  activeSpec.forEach(([la, du, pool]) => {
+    const e = pool.find(x => !used.has(x.assetNo)); if (!e) return; used.add(e.assetNo);
+    const dept = pick(DEPTS);
+    loans.push({ id: 'R' + pad(++ln).padStart(4, '0'), assetNo: e.assetNo, dept, position: pick(['주무관', '주무관', '팀장', '과장']), docNo: doc(dept), loanDate: addDays(t, la), dueDate: addDays(t, du), loanChecker: pick(['정', '부']), returnDate: '', returnChecker: '' });
+    e.status = '대여 중';
+  });
+  const histPool = equipment.filter(e => mOf(e).usage === '대여용' && ['노트북', 'PC', '모니터'].includes(mOf(e).type));
+  const hist = [];
+  for (let i = 0; i < 22; i++) {
+    const e = pick(histPool), dept = pick(DEPTS);
+    const loanDate = addDays(t, -ri(60, 380)), dur = ri(7, 60);
+    const dueDate = addDays(loanDate, dur);
+    const returnDate = addDays(dueDate, rnd() < 0.2 ? ri(1, 6) : -ri(0, 5));
+    hist.push({ assetNo: e.assetNo, dept, position: pick(['주무관', '주무관', '팀장', '과장']), docNo: doc(dept), loanDate, dueDate, loanChecker: pick(['정', '부']), returnDate: returnDate < loanDate ? loanDate : returnDate, returnChecker: pick(['정', '부']) });
+  }
+  hist.sort((a, b) => cmp(a.loanDate, b.loanDate)).forEach(x => loans.unshift(Object.assign({ id: 'H' + pad(++ln).padStart(4, '0') }, x)));
+
+  // ---- 소모품 ----
+  const csSpec = [
+    ['HP LaserJet Pro M404dn', '토너', 'HP 59A 검정 토너(CF259A)', 98000, 4, 1.5],
+    ['HP LaserJet Pro M404dn', '유지보수키트', 'HP 퓨저 키트(RM2-5399)', 210000, 0.15, 1.0],
+    ['삼성 SL-X4300LX', '토너', '삼성 CLT-K806S 검정 토너', 95000, 3, 1.3],
+    ['삼성 SL-X4300LX', '토너', '삼성 CLT-C806S 파랑 토너', 165000, 1.2, 1.0],
+    ['삼성 SL-X4300LX', '유지보수키트', '삼성 이미징유닛(CLT-R806K)', 260000, 0.3, 1.0],
+    ['캐논 iR-ADV DX C3826', '토너', '캐논 NPG-84 검정 토너', 89000, 3.5, 1.5],
+    ['캐논 iR-ADV DX C3826', '토너', '캐논 NPG-84 노랑 토너', 145000, 1.2, 1.05],
+    ['Epson L15160', '잉크', 'Epson 008 검정 잉크', 28000, 5, 1.1],
+    ['Epson L15160', '잉크', 'Epson 008 시안 잉크', 28000, 3, 1.0],
+    ['Epson L15160', '유지보수키트', 'Epson 폐잉크 패드(C9345)', 22000, 0.4, 1.0],
+    ['Epson L6290', '잉크', 'Epson 003 검정 잉크', 9000, 4, 1.0],
+    ['Epson L6290', '헤드', 'Epson L6290 프린트헤드', 150000, 0.25, 1.0],
+    ['신도리코 D420', '토너', '신도리코 D420 검정 토너', 75000, 3, 1.0],
+  ];
+  const LY = Y - 1;
+  let lg = 0;
+  csSpec.forEach(([pm, kind, name, price, rate, factor], ci) => {
+    const units = equipment.filter(e => { const m = mOf(e); return m.type === '프린터' && m.name === pm && e.status !== '불용처리'; }).length;
+    const annLY = rate * units, annTY = rate * units * factor;
+    const c = { id: 'C' + pad(ci + 1).padStart(3, '0'), printerModel: pm, kind, name, price, initialStock: Math.round(annLY * 0.2), registeredDate: `${LY}-01-01` };
+    consumables.push(c);
+    const ev = [];
+    [[`${LY}-01-06`, .6], [`${LY}-04-06`, .4], [`${LY}-07-06`, .1], [`${LY}-10-06`, .05], [`${Y}-01-06`, .5], [`${Y}-04-06`, .35], [`${Y}-07-06`, .1]]
+      .forEach(([d, r]) => { const q = Math.round(annLY * r); if (q > 0 && d <= t) ev.push({ kind: '입고', date: d, qty: q }); });
+    [[LY, annLY], [Y, annTY]].forEach(([yy, ann]) => {
+      for (let mo = 1; mo <= 12; mo++) {
+        const first = `${yy}-${pad(mo)}-01`; if (first > t) break;
+        const dim = new Date(yy, mo, 0).getDate();
+        const lastDay = (yy === Y && mo === pd(t).getMonth() + 1) ? Math.max(1, pd(t).getDate() - 1) : dim;
+        const frac = lastDay / dim;
+        let q = Math.floor(ann / 12 * frac * (0.8 + 0.4 * rnd()) + rnd());
+        while (q > 0) {
+          const part = Math.min(q, ri(1, Math.max(1, Math.ceil(ann / 40))));
+          ev.push({ kind: '불출', date: `${yy}-${pad(mo)}-${pad(ri(1, lastDay))}`, qty: part, dept: pick(DEPTS) });
+          q -= part;
+        }
+      }
+    });
+    ev.sort((a, b) => cmp(a.date, b.date) || (a.kind === '입고' ? -1 : 1));
+    let stock = c.initialStock;
+    ev.forEach(x => {
+      if (x.kind === '입고') stock += x.qty;
+      else { if (stock <= 0) return; if (x.qty > stock) x.qty = stock; stock -= x.qty; }
+      stockLogs.push({ id: 'L' + String(++lg).padStart(5, '0'), consumableId: c.id, kind: x.kind, date: x.date, qty: x.qty, dept: x.dept || '', handler: pick(['정', '부']), note: x.kind === '입고' ? `${x.date.slice(0, 4)}년 ${qOf(x.date)}분기 구매` : '' });
+    });
+  });
+  stockLogs.sort((a, b) => cmp(a.date, b.date));
+
+  // ---- 폐토너 (1대1 교환) ----
+  const wasteLogs = []; let wg = 0;
+  const tonerIds = new Set(consumables.filter(c => c.kind === '토너').map(c => c.id));
+  const missing = [];
+  stockLogs.forEach(l => {
+    if (l.kind !== '불출' || !tonerIds.has(l.consumableId)) return;
+    l.returnQty = l.qty;
+    if (rnd() < 0.03) { l.returnQty = l.qty - 1; missing.push(l); }
+  });
+  missing.forEach(l => { // 미반납 일부는 나중에 추가 회수
+    if (rnd() < 0.6) { const d = addDays(l.date, ri(3, 20)); if (d < t) wasteLogs.push({ id: 'W' + String(++wg).padStart(4, '0'), consumableId: l.consumableId, kind: '추가회수', date: d, qty: 1, dept: l.dept, vendor: '', handler: pick(['정', '부']), note: `${l.date} 불출분 미반납 회수` }); }
+  });
+  const pickups = [];
+  [LY, Y].forEach(yy => ['03-25', '06-25', '09-25', '12-22'].forEach(md => { const d = `${yy}-${md}`; if (d < t) pickups.push(d); }));
+  const processed = {};
+  pickups.forEach(d => consumables.filter(c => tonerIds.has(c.id)).forEach(c => {
+    let got = 0;
+    stockLogs.forEach(l => { if (l.consumableId === c.id && l.kind === '불출' && l.date <= d) got += l.returnQty; });
+    wasteLogs.forEach(w => { if (w.consumableId === c.id && w.kind === '추가회수' && w.date <= d) got += w.qty; });
+    const stored = got - (processed[c.id] || 0);
+    if (stored > 0) { processed[c.id] = got; wasteLogs.push({ id: 'W' + String(++wg).padStart(4, '0'), consumableId: c.id, kind: '처리', date: d, qty: stored, dept: '', vendor: pick(['재활용 업체 수거', '제조사 회수']), handler: pick(['정', '부']), note: `${d.slice(0, 4)}년 ${qOf(d)}분기 정기 반출` }); }
+  }));
+  wasteLogs.sort((a, b) => cmp(a.date, b.date));
+
+  // ---- 설정 ----
+  const cq = qOf(t);
+  const budgets = {};
+  for (let q = 1; q <= 4; q++) budgets[`${Y}-${q}`] = q <= 2 ? 30000000 : 8000000;
+  const prevY = cq === 1 ? Y - 1 : Y, prevQ = cq === 1 ? 4 : cq - 1;
+  const reportExports = {};
+  reportExports[`${prevY}-${prevQ}`] = new Date(pd(qStart(prevY, prevQ)).getTime() + 3 * 86400000 + 10 * 3600000).toISOString();
+  return normalize({ version: APP_VERSION, models, equipment, loans, consumables, stockLogs, wasteLogs, settings: { budgets, reportExports, purchasePlans: {}, fileInfo: null, depts: DEPTS.slice(), dataKind: 'sample' } });
+}
+
+/* =====================================================================
+   모달
+   ===================================================================== */
+let _mOk = null;
+function openModal(title, body, onOk, okLabel = '저장', extra = [], opts = {}) {
+  document.querySelector('#modalBg .modal').classList.toggle('wide', !!opts.wide);
+  document.getElementById('mTitle').textContent = title;
+  document.getElementById('mBody').innerHTML = body;
+  document.getElementById('mErr').textContent = '';
+  const foot = document.getElementById('mFoot');
+  foot.innerHTML = '';
+  extra.forEach(b => { const el = document.createElement('button'); el.className = 'btn left ' + (b.cls || ''); el.textContent = b.label; el.onclick = b.fn; foot.appendChild(el); });
+  const c = document.createElement('button'); c.className = 'btn'; c.textContent = opts.cancelLabel || '취소'; c.onclick = closeModal; foot.appendChild(c);
+  if (onOk) { const o = document.createElement('button'); o.className = 'btn primary'; o.textContent = okLabel; o.onclick = () => { const r = onOk(); if (r !== false) closeModal(); }; foot.appendChild(o); }
+  _mOk = onOk;
+  document.getElementById('modalBg').classList.remove('hidden');
+  const first = document.querySelector('#mBody input:not([type=hidden]), #mBody select');
+  if (first) first.focus();
+}
+function closeModal() { document.getElementById('modalBg').classList.add('hidden'); _mOk = null; }
+function mErr(msg) { document.getElementById('mErr').textContent = msg; return false; }
+document.addEventListener('keydown', e => {
+  if (document.getElementById('modalBg').classList.contains('hidden')) return;
+  if (e.key === 'Escape') closeModal();
+});
+const gv = id => document.getElementById(id).value.trim();
+function fSel(id, opts, val, extra = '') {
+  return `<select id="${id}" ${extra}>${opts.map(o => { const [v, l] = Array.isArray(o) ? o : [o, o]; return `<option value="${h(v)}"${String(v) === String(val) ? ' selected' : ''}>${h(l)}</option>`; }).join('')}</select>`;
+}
+const fIn = (id, val = '', type = 'text', extra = '') => `<input id="${id}" type="${type}" value="${h(val)}" ${extra}>`;
+const fRow = (label, inner, req) => `<div class="frow"><label>${label}${req ? ' <b class="req">*</b>' : ''}</label>${inner}</div>`;
+const workerSel = (id, v) => fSel(id, [['정', '정 담당자'], ['부', '부 담당자']], v || worker);
+
+/* =====================================================================
+   공통 상단
+   ===================================================================== */
+function renderTop() {
+  const tabs = [['home', '① 홈(알림판)'], ['equip', '② 장비·대여'], ['cons', '③ 소모품'], ['report', '④ 분기 보고'], ['depts', '⑤ 부서 관리']];
+  document.getElementById('nav').innerHTML = tabs.map(([k, l]) => `<button class="${S.screen === k ? 'on' : ''}" onclick="go('${k}')">${l}</button>`).join('');
+  document.getElementById('worker').value = worker;
+  const fi = DB.settings.fileInfo;
+  let info;
+  if (loadedName) info = `📄 ${h(loadedName)}` + (fi ? ` · 저장 ${fmtDT(fi.savedAt)} · ${WLABEL[fi.savedBy] || ''}` : '');
+  else if (fi) info = `저장 ${fmtDT(fi.savedAt)} · ${WLABEL[fi.savedBy] || ''}`;
+  else info = DB.settings.dataKind === 'sample' ? '아직 파일로 저장 안 함' : '새 데이터 (아직 파일로 저장 안 함)';
+  if (DB.settings.dataKind === 'sample') info = `<span class="samplebadge">샘플 데이터</span> ` + info;
+  document.getElementById('fileinfo').innerHTML = info;
+  document.getElementById('dirtyBadge').innerHTML = dirty
+    ? `<span class="dirty" onclick="showChanges()" title="눌러서 저장 안 한 변경 내역 보기">● 저장 안 한 변경 있음 · 내역 보기 ▸</span>`
+    : `<span class="saved" onclick="showChanges()" title="눌러서 변경 내역 보기">변경 없음</span>`;
+  // datalists
+  document.getElementById('dlDept').innerHTML = DB.settings.depts.slice().sort((a, b) => a.localeCompare(b, 'ko')).map(d => `<option value="${h(d)}">`).join('');
+  const pos = new Set(POSITIONS); DB.loans.forEach(l => l.position && pos.add(l.position));
+  document.getElementById('dlPos').innerHTML = [...pos].map(d => `<option value="${h(d)}">`).join('');
+}
+function go(screen) { S.screen = screen; render(); window.scrollTo(0, 0); }
+
+function render() {
+  const ae = document.activeElement, fid = ae && ae.id;
+  let sel = null; try { sel = [ae.selectionStart, ae.selectionEnd]; } catch (e) { }
+  buildIndex();
+  renderTop();
+  const main = document.getElementById('main');
+  main.innerHTML = ({ home: renderHome, equip: renderEquip, cons: renderCons, report: renderReport, depts: renderDepts })[S.screen]();
+  if (fid) {
+    const el = document.getElementById(fid);
+    if (el && main.contains(el)) { el.focus(); try { if (sel && sel[0] != null) el.setSelectionRange(sel[0], sel[1]); } catch (e) { } }
+  }
+  enhanceTables(main);
+  if (S.highlight) {
+    const el = document.getElementById(S.highlight); S.highlight = null;
+    if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('flash'); }
+  }
+}
+
+/* =====================================================================
+   ⑤ 부서 관리
+   ===================================================================== */
+function ensureDept(name) {
+  name = (name || '').trim();
+  if (name && name !== RENTAL_LOC && !DB.settings.depts.includes(name)) DB.settings.depts.push(name);
+}
+function deptUsage() {
+  const u = {}, g = n => (u[n] = u[n] || { eq: 0, loan: 0, active: 0, out: 0, waste: 0 });
+  DB.equipment.forEach(e => { if (e.location && e.location !== RENTAL_LOC && e.status !== '불용처리') g(e.location).eq++; });
+  DB.loans.forEach(l => { if (!l.dept) return; g(l.dept).loan++; if (!l.returnDate) u[l.dept].active++; });
+  DB.stockLogs.forEach(l => { if (l.kind === '불출' && l.dept) g(l.dept).out += l.qty; });
+  DB.wasteLogs.forEach(w => { if (w.kind === '추가회수' && w.dept) g(w.dept).waste += w.qty; });
+  return u;
+}
+function renderDepts() {
+  const u = deptUsage(), list = DB.settings.depts.slice().sort((a, b) => a.localeCompare(b, 'ko'));
+  const z = { eq: 0, loan: 0, active: 0, out: 0, waste: 0 };
+  const row = (d, listed) => {
+    const x = u[d] || z;
+    return `<tr><td><b>${h(d)}</b></td><td class="n">${fmtN(x.eq)}</td><td class="n">${fmtN(x.loan)}</td><td class="n">${x.active ? `<span class="txt-orange">${x.active}</span>` : 0}</td><td class="n">${fmtN(x.out)}</td><td class="n">${fmtN(x.waste)}</td>
+      <td>${listed ? `<button class="btn sm" onclick="renameDeptModal(${ja(d)})">이름 변경</button> <button class="btn sm danger" onclick="delDept(${ja(d)})">삭제</button>`
+        : `<button class="btn sm primary" onclick="ensureDept(${ja(d)});changed('부서 목록에 추가했습니다.')">목록에 추가</button> <button class="btn sm" onclick="renameDeptModal(${ja(d)})">다른 이름으로 바꾸기</button>`}</td></tr>`;
+  };
+  const unlisted = Object.keys(u).filter(d => !DB.settings.depts.includes(d)).sort((a, b) => a.localeCompare(b, 'ko'));
+  const head = `<thead><tr><th>부서명</th><th class="n">설치 장비(대)</th><th class="n">대여(건)</th><th class="n">대여 중</th><th class="n">소모품 불출(개)</th><th class="n">폐토너 추가 회수</th><th></th></tr></thead>`;
+  return `<h2>부서 관리</h2>
+  <div class="panel">
+    <div class="filters"><input id="dpNew" placeholder="새 부서명 (예: 도시계획과)" onkeydown="if(event.key==='Enter')addDept()"><button class="btn primary" onclick="addDept()">+ 추가</button>
+      <button class="btn" onclick="bulkDeptModal()">여러 부서 한 번에 추가</button><div class="spacer"></div><span class="muted">${list.length}개 부서</span></div>
+    <div class="muted" style="margin-bottom:10px">여기 등록한 부서가 대여 부서·수령부서·위치 입력칸의 자동완성 목록으로 나옵니다. 이름을 바꾸면 그 부서로 남은 장비 위치·대여·불출·폐토너 기록도 모두 함께 바뀝니다.</div>
+    <div class="tablewrap"><table class="t">${head}<tbody>${list.map(d => row(d, true)).join('') || '<tr><td colspan="7" class="empty">등록된 부서가 없습니다.</td></tr>'}</tbody></table></div>
+  </div>
+  ${unlisted.length ? `<div class="panel"><h3>목록에 없는 부서명 <span class="muted">기록에는 쓰였지만 부서 목록에 없는 이름 — 오타라면 [다른 이름으로 바꾸기]로 정리하세요</span></h3>
+    <div class="tablewrap"><table class="t">${head}<tbody>${unlisted.map(d => row(d, false)).join('')}</tbody></table></div></div>` : ''}`;
+}
+function addDept() {
+  const el = document.getElementById('dpNew'), n = el.value.trim();
+  if (!n) { el.focus(); return; }
+  if (n === RENTAL_LOC) { alert('이 이름은 대여 장비 보관 위치로 쓰이므로 부서로 등록할 수 없습니다.'); return; }
+  if (DB.settings.depts.includes(n)) { alert('이미 등록된 부서입니다.'); return; }
+  DB.settings.depts.push(n); el.value = ''; changed(`${n}을(를) 추가했습니다.`);
+  const again = document.getElementById('dpNew'); if (again) again.focus();
+}
+function bulkDeptModal() {
+  openModal('여러 부서 한 번에 추가',
+    `<div class="muted" style="margin-bottom:8px">한 줄에 부서 하나씩 입력하거나, 엑셀의 부서 열을 복사해 붙여넣으세요. 이미 있는 부서는 건너뜁니다.</div>
+     <textarea id="dpBulk" rows="10" style="width:100%;padding:8px;border:1px solid #c9d2e0;border-radius:4px" placeholder="도시계획과&#10;환경과&#10;세무과"></textarea>`,
+    () => {
+      const names = [...new Set(gv('dpBulk').split(/[\r\n\t,]+/).map(s => s.trim()).filter(s => s && s !== RENTAL_LOC))];
+      const add = names.filter(n => !DB.settings.depts.includes(n));
+      if (!add.length) return mErr('추가할 새 부서가 없습니다.');
+      DB.settings.depts.push(...add); changed(`${add.length}개 부서를 추가했습니다.`);
+    }, '추가');
+}
+function renameDeptModal(old) {
+  const x = deptUsage()[old] || { eq: 0, loan: 0, out: 0, waste: 0 };
+  openModal(`부서 이름 변경 · ${old}`,
+    `<div class="kv"><span>설치 장비 <b>${x.eq}</b>대</span><span>대여 <b>${x.loan}</b>건</span><span>불출 <b>${x.out}</b>개</span><span>폐토너 회수 <b>${x.waste}</b>개</span></div>` +
+    fRow('새 이름', fIn('dpName', old, 'text', 'list="dlDept"'), true) +
+    `<div class="hint" style="margin-left:0">이 부서로 기록된 장비 위치·대여·불출·폐토너 기록이 모두 새 이름으로 바뀝니다. 이미 있는 부서명을 입력하면 두 부서가 하나로 합쳐집니다.</div>`,
+    () => {
+      const neu = gv('dpName');
+      if (!neu) return mErr('새 이름을 입력하세요.');
+      if (neu === RENTAL_LOC) return mErr('이 이름은 대여 장비 보관 위치로 쓰여 사용할 수 없습니다.');
+      if (neu === old) return;
+      if (DB.settings.depts.includes(neu) && !confirm(`"${neu}" 부서가 이미 있습니다. "${old}"의 기록을 "${neu}"로 합칠까요?`)) return false;
+      let n = 0;
+      DB.equipment.forEach(e => { if (e.location === old) { e.location = neu; n++; } });
+      DB.loans.forEach(l => { if (l.dept === old) { l.dept = neu; n++; } });
+      DB.stockLogs.forEach(l => { if (l.dept === old) { l.dept = neu; n++; } });
+      DB.wasteLogs.forEach(l => { if (l.dept === old) { l.dept = neu; n++; } });
+      DB.settings.depts = [...new Set(DB.settings.depts.map(d => d === old ? neu : d).concat(DB.settings.depts.includes(old) ? [] : [neu]))];
+      changed(`"${old}" → "${neu}" 변경 (기록 ${n}건 반영)`);
+    }, '변경');
+}
+function delDept(d) {
+  const x = deptUsage()[d];
+  const used = x && (x.eq || x.loan || x.out || x.waste);
+  if (!confirm(`"${d}"을(를) 부서 목록에서 삭제할까요?` + (used ? `\n\n이 부서로 남은 기록(장비 ${x.eq}대, 대여 ${x.loan}건 등)은 지워지지 않고 이름이 그대로 남습니다.\n부서가 다른 부서로 바뀐 경우라면 [이름 변경]으로 합치는 것이 좋습니다.` : ''))) return;
+  DB.settings.depts = DB.settings.depts.filter(x => x !== d); changed('부서를 삭제했습니다.');
+}
+
+/* ---------- 표 정렬 (모든 표 공통) ----------
+   머리글을 누르면 오름차순 → 내림차순 → 기본 순서.
+   data-sort 속성이 있는 표(페이지 나뉨)는 sortData()로 전체 데이터를 정렬하고,
+   나머지 표는 화면의 행을 정렬한다. 소계·합계 행은 제자리를 지키고 그 사이 구간만 정렬한다. */
+function tableKey(i) {
+  const sub = S.screen === 'equip' ? S.eqTab : S.screen === 'cons' ? S.csTab : S.screen === 'report' ? (S.rp && S.rp.view) : '';
+  return `${S.screen}.${sub}.${i}`;
+}
+function parseSortVal(s) {
+  if (s == null) return null;
+  if (typeof s === 'number') return isFinite(s) ? s : null;
+  s = String(s).trim();
+  if (!s || s === '-') return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s;
+  const m = /^([▲▼+−-]?)\s*([\d,]+(?:\.\d+)?)/.exec(s);
+  if (m) return (m[1] === '▼' || m[1] === '−' || m[1] === '-' ? -1 : 1) * Number(m[2].replace(/,/g, ''));
+  return s;
+}
+function sortCmp(a, b, dir) {
+  if (a == null && b == null) return 0; if (a == null) return 1; if (b == null) return -1; // 빈 값은 항상 아래로
+  if (typeof a === 'number' && typeof b === 'number') return dir * (a - b);
+  return dir * String(a).localeCompare(String(b), 'ko', { numeric: true });
+}
+function sortData(key, list, valsFn) {
+  const st = S.tsort[key]; if (!st) return list;
+  return list.map(x => { const v = valsFn(x)[st.col]; return [v === '' || v == null ? null : v, x]; })
+    .sort((a, b) => sortCmp(a[0], b[0], st.dir)).map(x => x[1]);
+}
+function cellVal(td) {
+  if (!td) return null;
+  if (td.dataset.v !== undefined) { const n = Number(td.dataset.v); return td.dataset.v !== '' && !isNaN(n) ? n : parseSortVal(td.dataset.v); }
+  const inp = td.querySelector('input');
+  return parseSortVal(inp ? inp.value : td.textContent);
+}
+function domSort(tb, st) {
+  const body = tb.tBodies[0]; if (!body) return;
+  const rows = [...body.rows], out = []; let seg = [];
+  const flush = () => { seg.map(r => [cellVal(r.cells[st.col]), r]).sort((a, b) => sortCmp(a[0], b[0], st.dir)).forEach(x => out.push(x[1])); seg = []; };
+  rows.forEach(r => { if (r.classList.contains('sub') || r.classList.contains('total') || r.querySelector('td.empty')) { flush(); out.push(r); } else seg.push(r); });
+  flush(); out.forEach(r => body.appendChild(r));
+}
+function enhanceTables(root) {
+  root.querySelectorAll('table.t').forEach((tb, i) => {
+    const key = tb.dataset.sort || tableKey(i), st = S.tsort[key];
+    [...tb.querySelectorAll('thead th')].forEach((th, ci) => {
+      if (!th.textContent.trim()) return;
+      th.classList.add('sortable'); th.title = '누를 때마다 오름차순 → 내림차순 → 기본 순서';
+      const on = st && st.col === ci;
+      th.insertAdjacentHTML('beforeend', `<span class="sarrow${on ? ' on' : ''}">${on ? (st.dir > 0 ? '▲' : '▼') : '⇅'}</span>`);
+      th.onclick = () => toggleSort(key, ci);
+    });
+    if (!tb.dataset.sort && st) domSort(tb, st);
+  });
+}
+function toggleSort(key, col) {
+  const s = S.tsort[key];
+  if (!s || s.col !== col) S.tsort[key] = { col, dir: 1 };
+  else if (s.dir === 1) s.dir = -1;
+  else delete S.tsort[key];
+  S.aPage = 0; S.lPage = 0; S.wPage = 0;
+  render();
+}
+
+/* =====================================================================
+   ① 홈
+   ===================================================================== */
+function renderHome() {
+  const t = TODAY(), Y = +t.slice(0, 4), Q = qOf(t);
+  const active = DB.loans.filter(l => !l.returnDate);
+  const overdue = active.filter(l => l.dueDate < t).sort((a, b) => cmp(a.dueDate, b.dueDate));
+  const soon = active.filter(l => l.dueDate >= t && diffDays(t, l.dueDate) <= 7).sort((a, b) => cmp(a.dueDate, b.dueDate));
+  const mrows = DB.models.map(m => ({ m, ex: expiry(m), st: lifeStatus(m, t), n: DB.equipment.filter(e => e.modelId === m.id && e.status !== '불용처리').length })).filter(r => r.n > 0);
+  const buy = mrows.filter(r => r.st === '구매 소요 확정 대상').sort((a, b) => cmp(a.ex, b.ex));
+  const disp = mrows.filter(r => r.st === '불용 대상').sort((a, b) => cmp(a.ex, b.ex));
+  const exp = DB.settings.reportExports[`${Y}-${Q}`];
+  const rentalEq = DB.equipment.filter(e => MM[e.modelId].usage === '대여용');
+  const availN = rentalEq.filter(e => e.status === '대여 가능').length;
+
+  const loanLine = (l, cls, tag) => {
+    const e = DB.equipment.find(x => x.assetNo === l.assetNo); const m = e ? MM[e.modelId] : null;
+    const d = diffDays(t, l.dueDate);
+    const dd = d < 0 ? `<b>${-d}일 초과</b>` : d === 0 ? '<b>오늘 반납</b>' : `<b>${d}일 남음</b>`;
+    return `<div class="alert ${cls}" onclick="goLoan('${h(l.id)}')"><span class="tag">${tag}</span>
+      <span><b>${h(l.assetNo)}</b> ${m ? h(m.type + ' ' + m.name) : ''}</span>
+      <span>· ${h(l.dept)} ${h(l.position)}</span><span>· 공문 ${h(l.docNo)}</span>
+      <span>· 반납예정 ${h(l.dueDate)}</span><span>· ${dd}</span></div>`;
+  };
+  const modelLine = (r, cls, tag) => `<div class="alert ${cls}" onclick="goModel('${h(r.m.id)}')"><span class="tag">${tag}</span>
+      <span><b>${h(r.m.type)} · ${h(r.m.name)}</b></span><span class="muted">${h(r.m.usage)} / ${h(r.m.project)}</span>
+      <span>· <b>${r.n}대</b></span><span>· 만료일 ${r.ex}</span>
+      <span>· ${r.ex < t ? `${diffDays(r.ex, t)}일 경과` : `${diffDays(t, r.ex)}일 남음`}</span></div>`;
+
+  // 대여 가능 요약
+  const availByModel = DB.models.filter(m => m.usage === '대여용').map(m => ({ m, n: rentalEq.filter(e => e.modelId === m.id && e.status === '대여 가능').length, on: rentalEq.filter(e => e.modelId === m.id && e.status === '대여 중').length }))
+    .sort((a, b) => TYPES.indexOf(a.m.type) - TYPES.indexOf(b.m.type) || cmp(a.m.introDate, b.m.introDate));
+
+  const guide = !DB.models.length && !DB.consumables.length ? `
+  <div class="panel" style="border-color:#bcd0ff;background:#f7f9ff"><h3>🚀 빈 데이터로 시작했습니다. 아래 순서로 실제 데이터를 입력하세요.</h3>
+    <ol style="margin:0;padding-left:20px;line-height:1.9">
+      <li><b>부서 목록 확인</b> — <a href="#" onclick="go('depts');return false">⑤ 부서 관리</a>에서 우리 기관 부서로 추가·이름 변경·삭제</li>
+      <li><b>장비모델 등록</b> — <a href="#" onclick="S.eqTab='models';go('equip');return false">② 장비·대여 → 장비모델</a>에서 [+ 장비모델 추가] (모델명·도입사업명·도입일·사용연한·대여용/설치)</li>
+      <li><b>장비 추가</b> — 장비모델 목록의 [장비 추가] (대수 지정 시 자산번호 자동, 1대씩은 직접 입력)</li>
+      <li><b>진행 중인 대여 입력</b> — <a href="#" onclick="S.eqTab='rental';go('equip');return false">대여 현황·등록</a>에서 [+ 대여 등록] (대여일은 과거 날짜 가능)</li>
+      <li><b>소모품 등록</b> — <a href="#" onclick="S.csTab='stock';go('cons');return false">③ 소모품</a>에서 [+ 소모품 등록] (현재 보유 수량을 ‘최초 재고’로)</li>
+      <li><b>💾 저장</b> 후 공유 폴더에 올리기</li>
+    </ol></div>` : '';
+  return `
+  <h2>홈 · 알림판 <span class="muted">기준일 ${t} (${Y}년 ${Q}분기)</span></h2>${guide}
+  ${!exp ? `<div class="banner"><div>📋 <b>${Y}년 ${Q}분기 장비 보고</b>를 아직 내보내지 않았습니다. (분기 기준일 ${qEnd(Y, Q)})</div><button class="btn primary" onclick="goReport()">분기 보고 화면으로 →</button></div>`
+      : `<div class="banner ok"><div>✅ ${Y}년 ${Q}분기 장비 보고를 내보냈습니다. (${fmtDT(exp)})</div><button class="btn" onclick="goReport()">분기 보고 보기</button></div>`}
+  <div class="cards">
+    <div class="card red"><div class="k">반납 기한 초과</div><div class="v">${overdue.length}건</div></div>
+    <div class="card orange"><div class="k">반납 임박 (7일 이내)</div><div class="v">${soon.length}건</div></div>
+    <div class="card"><div class="k">대여 중</div><div class="v">${active.length}건</div></div>
+    <div class="card green"><div class="k">지금 대여 가능</div><div class="v">${availN}대</div></div>
+    <div class="card orange"><div class="k">구매 소요 확정 대상</div><div class="v">${buy.reduce((s, r) => s + r.n, 0)}대</div><div class="muted">${buy.length}개 모델</div></div>
+    <div class="card red"><div class="k">불용 대상 (미처리)</div><div class="v">${disp.reduce((s, r) => s + r.n, 0)}대</div><div class="muted">${disp.length}개 모델</div></div>
+  </div>
+  <div class="grid g2">
+    <div class="panel"><h3>🔴 반납 기한 초과</h3>${overdue.map(l => loanLine(l, 'red', '기한 초과')).join('') || '<div class="empty">기한이 지난 대여가 없습니다.</div>'}
+      <h3 style="margin-top:16px">🟠 반납 임박 (7일 이내)</h3>${soon.map(l => loanLine(l, 'orange', '반납 임박')).join('') || '<div class="empty">7일 이내 반납 예정인 대여가 없습니다.</div>'}</div>
+    <div class="panel"><h3>🟠 구매 소요 확정 대상 <span class="muted">사용연한 만료 1년 이내 — 교체 장비 구매 소요 확정 필요</span></h3>${buy.map(r => modelLine(r, 'orange', '구매 소요')).join('') || '<div class="empty">해당 장비가 없습니다.</div>'}
+      <h3 style="margin-top:16px">🔴 불용 대상 <span class="muted">사용연한 경과 — 불용처리 필요 (미처리 대수)</span></h3>${disp.map(r => modelLine(r, 'red', '불용 대상')).join('') || '<div class="empty">해당 장비가 없습니다.</div>'}</div>
+  </div>
+  <div class="panel"><h3>대여 가능 대수 요약 <button class="btn sm" style="margin-left:8px" onclick="S.eqTab='rental';go('equip')">장비·대여 화면으로</button></h3>
+    <div class="chips">${availByModel.map(r => `<div class="chip ${r.n ? '' : 'zero'}"><span class="tp">${h(r.m.type)}</span>${h(r.m.name)} &nbsp;<b>${r.n}</b>대 <span class="muted">(대여 중 ${r.on})</span></div>`).join('')}</div>
+  </div>`;
+}
+function goLoan(id) { S.screen = 'equip'; S.eqTab = 'rental'; S.highlight = 'loan-' + id; render(); }
+function goModel(id) { const t = TODAY(); S.rp = Object.assign(rpDefault(), { y: +t.slice(0, 4), q: qOf(t), view: 'summary' }); S.screen = 'report'; S.highlight = 'rm-' + id; render(); }
+function goReport() { S.screen = 'report'; render(); window.scrollTo(0, 0); }
+
+/* =====================================================================
+   ② 장비·대여
+   ===================================================================== */
+function renderEquip() {
+  const tabs = [['rental', '대여 현황·등록'], ['history', '대여 이력'], ['all', '전체 장비 목록'], ['models', '장비모델(도입 묶음)']];
+  const sub = `<div class="subtabs">${tabs.map(([k, l]) => `<button class="${S.eqTab === k ? 'on' : ''}" onclick="S.eqTab='${k}';render()">${l}</button>`).join('')}</div>`;
+  const body = { rental: renderRental, history: renderHistory, all: renderAllEquip, models: renderModels }[S.eqTab]();
+  return `<h2>장비·대여</h2>${sub}${body}`;
+}
+
+function renderRental() {
+  const t = TODAY();
+  const rental = DB.equipment.filter(e => MM[e.modelId].usage === '대여용');
+  const rmodels = DB.models.filter(m => m.usage === '대여용').sort((a, b) => TYPES.indexOf(a.type) - TYPES.indexOf(b.type) || cmp(a.introDate, b.introDate));
+  const chips = rmodels.map(m => { const n = rental.filter(e => e.modelId === m.id && e.status === '대여 가능').length; return `<div class="chip ${n ? '' : 'zero'}"><span class="tp">${h(m.type)}</span>${h(m.name)} <span class="muted">${m.introDate.slice(0, 4)}</span> &nbsp;<b>${n}</b>대</div>`; }).join('');
+  const total = rental.filter(e => e.status === '대여 가능').length;
+  const active = DB.loans.filter(l => !l.returnDate).sort((a, b) => cmp(a.dueDate, b.dueDate));
+  const eqOf = a => DB.equipment.find(e => e.assetNo === a);
+  const remain = l => { const d = diffDays(t, l.dueDate); return d < 0 ? `<span class="txt-red">${-d}일 초과</span>` : d <= 7 ? `<span class="txt-orange">${d}일</span>` : `${d}일`; };
+  const activeRows = active.map(l => {
+    const e = eqOf(l.assetNo), m = e ? MM[e.modelId] : {}; const over = l.dueDate < t;
+    return `<tr id="loan-${h(l.id)}" class="${over ? 'rowred' : ''}"><td>${h(l.assetNo)}</td><td>${h(m.type || '')}</td><td>${h(m.name || '')}</td><td>${h(l.dept)}</td><td>${h(l.position)}</td><td>${h(l.docNo)}</td>
+      <td>${h(l.loanDate)}</td><td>${h(l.dueDate)}</td><td class="n" data-v="${diffDays(t, l.dueDate)}">${remain(l)}</td><td class="c">${h(WLABEL[l.loanChecker] || '')}</td>
+      <td><button class="btn sm primary" onclick="returnModal(${ja(l.id)})">반납</button> <button class="btn sm" onclick="editLoanModal(${ja(l.id)})">수정</button></td></tr>`;
+  }).join('');
+  let list = rental.filter(e => (!S.rf.type || MM[e.modelId].type === S.rf.type) && (!S.rf.status || e.status === S.rf.status)).sort(sortEquip);
+  const rows = list.map(e => {
+    const m = MM[e.modelId], l = LOAN_BY_ASSET[e.assetNo];
+    return `<tr id="eq-${h(e.assetNo)}"><td>${h(e.assetNo)}</td><td>${h(m.type)}</td><td>${h(m.name)}</td><td>${eqBadge(e.status)}</td>
+      <td>${l ? h(l.dept) : ''}</td><td>${l ? h(l.position) : ''}</td><td>${l ? h(l.dueDate) : ''}</td><td class="n"${l ? ` data-v="${diffDays(t, l.dueDate)}"` : ''}>${l ? remain(l) : ''}</td>
+      <td>${lifeBadge(lifeStatus(m, t))}</td>
+      <td>${e.status === '대여 가능' ? `<button class="btn sm primary" onclick="loanModal(${ja(e.assetNo)})">대여</button>` : ''}
+          ${l ? `<button class="btn sm primary" onclick="returnModal(${ja(l.id)})">반납</button>` : ''}
+          <button class="btn sm" onclick="S.hf.asset=${ja(e.assetNo)};S.eqTab='history';render()">이력</button>
+          <button class="btn sm" onclick="editEquipModal(${ja(e.assetNo)})">수정</button></td></tr>`;
+  }).join('');
+  return `
+  <div class="panel"><div class="filters"><h3 style="margin:0">지금 대여 가능: <span style="color:var(--primary)">${total}대</span></h3><div class="spacer"></div><button class="btn" onclick="exportRental()">📥 대여현황 엑셀</button><button class="btn primary" onclick="loanModal()">+ 대여 등록</button></div>
+    <div class="chips">${chips}</div></div>
+  <div class="panel"><h3>대여 중 장비 (${active.length}건) <span class="muted">반납예정일 순</span></h3>
+    <div class="tablewrap"><table class="t"><thead><tr><th>자산번호</th><th>종류</th><th>모델</th><th>대여 부서</th><th>직책</th><th>공문번호</th><th>대여일</th><th>반납예정일</th><th class="n">남은 일수</th><th class="c">대여 확인</th><th></th></tr></thead>
+    <tbody>${activeRows || '<tr><td colspan="11" class="empty">대여 중인 장비가 없습니다.</td></tr>'}</tbody></table></div></div>
+  <div class="panel"><h3>대여용 장비 목록</h3>
+    <div class="filters"><label>장비종류</label>${fSel('rfType', [['', '전체'], ...TYPES], S.rf.type, `onchange="S.rf.type=this.value;render()"`)}
+      <label>상태</label>${fSel('rfStatus', [['', '전체'], '대여 가능', '대여 중', '불용처리'], S.rf.status, `onchange="S.rf.status=this.value;render()"`)}
+      <span class="muted">${list.length}대</span></div>
+    <div class="tablewrap"><table class="t"><thead><tr><th>자산번호</th><th>종류</th><th>모델</th><th>상태</th><th>대여 부서</th><th>직책</th><th>반납예정일</th><th class="n">남은 일수</th><th>사용연한</th><th></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="10" class="empty">해당 장비가 없습니다.</td></tr>'}</tbody></table></div></div>`;
+}
+
+function loanModal(assetNo) {
+  const t = TODAY();
+  const avail = DB.equipment.filter(e => e.status === '대여 가능' && MM[e.modelId].usage === '대여용').sort(sortEquip);
+  if (!avail.length) { alert('지금 대여 가능한 장비가 없습니다.'); return; }
+  const opts = avail.map(e => { const m = MM[e.modelId], st = lifeStatus(m, t); return [e.assetNo, `${e.assetNo} · ${m.type} ${m.name}${st !== '정상' ? ` (${st})` : ''}`]; });
+  openModal('대여 등록',
+    fRow('장비', fSel('lAsset', opts, assetNo || opts[0][0]), true) +
+    fRow('대여 부서', fIn('lDept', '', 'text', 'list="dlDept" placeholder="예: 행정과"'), true) +
+    fRow('대여자 직책', fIn('lPos', '', 'text', 'list="dlPos" placeholder="예: 주무관"'), true) +
+    `<div class="hint">※ 개인정보 보호를 위해 이름은 입력하지 않습니다.</div>` +
+    fRow('공문번호', fIn('lDoc', '', 'text', 'placeholder="예: 행정과-1234"'), true) +
+    fRow('대여일', fIn('lDate', t, 'date'), true) +
+    fRow('반납예정일', fIn('lDue', addDays(t, 30), 'date'), true) +
+    fRow('대여 확인자', workerSel('lChk'), true),
+    () => {
+      const v = { assetNo: gv('lAsset'), dept: gv('lDept'), position: gv('lPos'), docNo: gv('lDoc'), loanDate: gv('lDate'), dueDate: gv('lDue'), loanChecker: gv('lChk') };
+      const err = loanValidate(v); if (err) return mErr(err);
+      const e = DB.equipment.find(x => x.assetNo === v.assetNo);
+      if (!e || e.status !== '대여 가능') return mErr('선택한 장비는 대여 가능 상태가 아닙니다.');
+      DB.loans.push(Object.assign({ id: uid('R') }, v, { returnDate: '', returnChecker: '' })); ensureDept(v.dept);
+      e.status = '대여 중';
+      changed(`${v.assetNo} 대여를 등록했습니다.`);
+    }, '대여 등록');
+}
+function loanValidate(v) {
+  const miss = [];
+  if (!v.dept) miss.push('대여 부서'); if (!v.position) miss.push('대여자 직책'); if (!v.docNo) miss.push('공문번호');
+  if (!v.loanDate) miss.push('대여일'); if (!v.dueDate) miss.push('반납예정일');
+  if (miss.length) return `필수 항목을 입력하세요: ${miss.join(', ')}`;
+  if (v.dueDate < v.loanDate) return '반납예정일은 대여일 이후여야 합니다.';
+  return '';
+}
+function editLoanModal(id) {
+  const l = DB.loans.find(x => x.id === id); if (!l) return;
+  openModal(`대여 정보 수정 · ${l.assetNo}`,
+    fRow('대여 부서', fIn('lDept', l.dept, 'text', 'list="dlDept"'), true) +
+    fRow('대여자 직책', fIn('lPos', l.position, 'text', 'list="dlPos"'), true) +
+    fRow('공문번호', fIn('lDoc', l.docNo), true) +
+    fRow('대여일', fIn('lDate', l.loanDate, 'date'), true) +
+    fRow('반납예정일', fIn('lDue', l.dueDate, 'date'), true) +
+    fRow('대여 확인자', workerSel('lChk', l.loanChecker), true),
+    () => {
+      const v = { dept: gv('lDept'), position: gv('lPos'), docNo: gv('lDoc'), loanDate: gv('lDate'), dueDate: gv('lDue'), loanChecker: gv('lChk') };
+      const err = loanValidate(v); if (err) return mErr(err);
+      Object.assign(l, v); ensureDept(v.dept); changed('대여 정보를 수정했습니다.');
+    }, '저장',
+    [{
+      label: '대여 기록 삭제', cls: 'danger', fn: () => {
+        if (!confirm('이 대여 기록을 삭제할까요? (잘못 등록한 경우에만 사용하세요)')) return;
+        DB.loans = DB.loans.filter(x => x !== l);
+        const e = DB.equipment.find(x => x.assetNo === l.assetNo); if (e && e.status === '대여 중') e.status = '대여 가능';
+        closeModal(); changed('대여 기록을 삭제했습니다.');
+      }
+    }]);
+}
+function returnModal(id) {
+  const l = DB.loans.find(x => x.id === id); if (!l) return;
+  const t = TODAY();
+  openModal(`반납 처리 · ${l.assetNo}`,
+    `<div class="kv"><span>대여 부서 <b>${h(l.dept)} ${h(l.position)}</b></span><span>공문 <b>${h(l.docNo)}</b></span><span>대여일 <b>${h(l.loanDate)}</b></span><span>반납예정 <b>${h(l.dueDate)}</b></span></div>` +
+    fRow('실제 반납일', fIn('rDate', t < l.loanDate ? l.loanDate : t, 'date'), true) +
+    fRow('반납 확인자', workerSel('rChk'), true),
+    () => {
+      const d = gv('rDate'); if (!d) return mErr('실제 반납일을 입력하세요.');
+      if (d < l.loanDate) return mErr('반납일은 대여일보다 앞설 수 없습니다.');
+      l.returnDate = d; l.returnChecker = gv('rChk');
+      const e = DB.equipment.find(x => x.assetNo === l.assetNo); if (e && e.status === '대여 중') e.status = '대여 가능';
+      changed(`${l.assetNo} 반납 처리했습니다.`);
+    }, '반납 처리');
+}
+
+function renderHistory() {
+  const t = TODAY();
+  const q = S.hf.asset.trim().toLowerCase();
+  const eqOf = a => DB.equipment.find(e => e.assetNo === a);
+  let list = DB.loans.filter(l => {
+    if (S.hf.dept && l.dept !== S.hf.dept) return false;
+    if (S.hf.status === 'active' && l.returnDate) return false;
+    if (S.hf.status === 'done' && !l.returnDate) return false;
+    if (q) { const e = eqOf(l.assetNo), m = e ? MM[e.modelId] : null; if (!(l.assetNo.toLowerCase().includes(q) || (m && m.name.toLowerCase().includes(q)) || l.docNo.toLowerCase().includes(q))) return false; }
+    return true;
+  }).sort((a, b) => cmp(b.loanDate, a.loanDate));
+  const depts = [...new Set(DB.loans.map(l => l.dept))].sort();
+  const rows = list.map(l => {
+    const e = eqOf(l.assetNo), m = e ? MM[e.modelId] : {};
+    let st;
+    if (!l.returnDate) st = l.dueDate < t ? '<span class="badge b-red">대여 중(기한 초과)</span>' : '<span class="badge b-orange">대여 중</span>';
+    else st = l.returnDate > l.dueDate ? `<span class="badge b-gray">반납(${diffDays(l.dueDate, l.returnDate)}일 지연)</span>` : '<span class="badge b-green">반납 완료</span>';
+    const days = diffDays(l.loanDate, l.returnDate || t);
+    return `<tr><td>${h(l.loanDate)}</td><td>${h(l.assetNo)}</td><td>${h((m.type || '') + ' ' + (m.name || ''))}</td><td>${h(l.dept)}</td><td>${h(l.position)}</td><td>${h(l.docNo)}</td>
+      <td>${h(l.dueDate)}</td><td>${h(l.returnDate || '')}</td><td class="n">${days}일</td><td class="c">${h(WLABEL[l.loanChecker] || '')}</td><td class="c">${h(WLABEL[l.returnChecker] || '')}</td><td>${st}</td></tr>`;
+  }).join('');
+  const byDept = {}; list.forEach(l => { byDept[l.dept] = byDept[l.dept] || { n: 0, a: 0 }; byDept[l.dept].n++; if (!l.returnDate) byDept[l.dept].a++; });
+  const deptRows = Object.entries(byDept).sort((a, b) => b[1].n - a[1].n).map(([d, v]) => `<tr><td><a href="#" onclick="S.hf.dept=${ja(d)};render();return false">${h(d)}</a></td><td class="n">${v.n}</td><td class="n">${v.a}</td></tr>`).join('');
+  return `
+  <div class="panel">
+    <div class="filters"><label>장비·모델·공문번호</label><input id="hfAsset" value="${h(S.hf.asset)}" placeholder="자산번호/모델명/공문번호" oninput="S.hf.asset=this.value;render()">
+      <label>부서</label>${fSel('hfDept', [['', '전체'], ...depts], S.hf.dept, `onchange="S.hf.dept=this.value;render()"`)}
+      <label>상태</label>${fSel('hfStatus', [['', '전체'], ['active', '대여 중'], ['done', '반납 완료']], S.hf.status, `onchange="S.hf.status=this.value;render()"`)}
+      <button class="btn sm" onclick="S.hf={asset:'',dept:'',status:''};render()">필터 초기화</button>
+      <span class="muted">${list.length}건</span></div>
+    <div class="grid" style="grid-template-columns:1fr 240px">
+      <div class="tablewrap"><table class="t"><thead><tr><th>대여일</th><th>자산번호</th><th>모델</th><th>대여 부서</th><th>직책</th><th>공문번호</th><th>반납예정일</th><th>실제 반납일</th><th class="n">기간</th><th class="c">대여 확인</th><th class="c">반납 확인</th><th>상태</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="12" class="empty">기록이 없습니다.</td></tr>'}</tbody></table></div>
+      <div class="tablewrap"><table class="t"><thead><tr><th>부서별</th><th class="n">대여</th><th class="n">진행</th></tr></thead><tbody>${deptRows}</tbody></table></div>
+    </div></div>`;
+}
+
+function renderAllEquip() {
+  const t = TODAY(), f = S.af, q = f.q.trim().toLowerCase();
+  let list = DB.equipment.filter(e => {
+    const m = MM[e.modelId];
+    if (f.type && m.type !== f.type) return false;
+    if (f.usage && m.usage !== f.usage) return false;
+    if (f.status && e.status !== f.status) return false;
+    if (f.life && lifeStatus(m, t) !== f.life) return false;
+    if (q && !(e.assetNo.toLowerCase().includes(q) || m.name.toLowerCase().includes(q) || (locOf(e) || '').toLowerCase().includes(q) || (m.project || '').toLowerCase().includes(q))) return false;
+    return true;
+  }).sort(sortEquip);
+  list = sortData('eqAll', list, e => { const m = MM[e.modelId]; return [e.assetNo, m.type, m.usage, m.name, m.project, m.introDate, expiry(m), lifeStatus(m, t), e.status, locOf(e), posOf(e), e.note]; });
+  const pages = Math.max(1, Math.ceil(list.length / PAGE)); if (S.aPage >= pages) S.aPage = pages - 1;
+  const slice = list.slice(S.aPage * PAGE, S.aPage * PAGE + PAGE);
+  const rows = slice.map(e => {
+    const m = MM[e.modelId];
+    return `<tr id="eq-${h(e.assetNo)}"><td>${h(e.assetNo)}</td><td>${h(m.type)}</td><td>${h(m.usage)}</td><td>${h(m.name)}</td><td>${h(m.project)}</td><td>${h(m.introDate)}</td><td>${expiry(m)}</td>
+    <td>${lifeBadge(lifeStatus(m, t))}</td><td>${eqBadge(e.status)}</td><td>${h(locOf(e))}</td><td>${h(posOf(e))}</td><td class="muted">${h(e.note || '')}</td>
+    <td><button class="btn sm" onclick="editEquipModal(${ja(e.assetNo)})">수정</button></td></tr>`;
+  }).join('');
+  return `
+  <div class="panel">
+    <div class="filters"><label>검색</label><input id="afQ" value="${h(f.q)}" placeholder="자산번호/모델/부서/사업명" oninput="S.af.q=this.value;S.aPage=0;render()">
+      <label>종류</label>${fSel('afType', [['', '전체'], ...TYPES], f.type, `onchange="S.af.type=this.value;S.aPage=0;render()"`)}
+      <label>구분</label>${fSel('afUsage', [['', '전체'], ...USAGES], f.usage, `onchange="S.af.usage=this.value;S.aPage=0;render()"`)}
+      <label>상태</label>${fSel('afStatus', [['', '전체'], ...EQ_STATUS], f.status, `onchange="S.af.status=this.value;S.aPage=0;render()"`)}
+      <label>사용연한</label>${fSel('afLife', [['', '전체'], ...LIFE_ST], f.life, `onchange="S.af.life=this.value;S.aPage=0;render()"`)}
+      <span class="muted">${fmtN(list.length)}대</span><div class="spacer"></div>
+      ${list.some(e => e.status !== '불용처리' && lifeStatus(MM[e.modelId], t) === '불용 대상') && f.life === '불용 대상' ? `<button class="btn danger" onclick="bulkDispose()">목록의 불용 대상 일괄 불용처리</button>` : ''}
+      <button class="btn primary" onclick="addEquipModal()">+ 장비 추가</button></div>
+    <div class="tablewrap"><table class="t" data-sort="eqAll"><thead><tr><th>자산번호</th><th>종류</th><th>구분</th><th>모델명</th><th>도입사업명</th><th>도입일</th><th>만료일</th><th>사용연한</th><th>상태</th><th>위치·사용부서</th><th>사용자 직책</th><th>비고</th><th></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="13" class="empty">해당 장비가 없습니다.</td></tr>'}</tbody></table></div>
+    <div class="pager"><button class="btn sm" ${S.aPage <= 0 ? 'disabled' : ''} onclick="S.aPage--;render()">◀ 이전</button> ${S.aPage + 1} / ${pages} 페이지 <button class="btn sm" ${S.aPage >= pages - 1 ? 'disabled' : ''} onclick="S.aPage++;render()">다음 ▶</button></div>
+  </div>`;
+}
+function bulkDispose() {
+  const t = TODAY(), f = S.af, q = f.q.trim().toLowerCase();
+  const list = DB.equipment.filter(e => {
+    const m = MM[e.modelId];
+    return e.status !== '불용처리' && e.status !== '대여 중' && lifeStatus(m, t) === '불용 대상' && (!f.type || m.type === f.type) && (!f.usage || m.usage === f.usage) && (!f.status || e.status === f.status)
+      && (!q || e.assetNo.toLowerCase().includes(q) || m.name.toLowerCase().includes(q) || (e.location || '').toLowerCase().includes(q) || (m.project || '').toLowerCase().includes(q));
+  });
+  if (!list.length) { alert('불용처리할 장비가 없습니다. (대여 중 장비는 제외)'); return; }
+  if (!confirm(`목록의 불용 대상 ${list.length}대를 불용처리할까요?`)) return;
+  list.forEach(e => { e.status = '불용처리'; e.note = (e.note ? e.note + ' / ' : '') + `${t} 불용처리`; });
+  changed(`${list.length}대를 불용처리했습니다.`);
+}
+function editEquipModal(assetNo) {
+  const e = DB.equipment.find(x => x.assetNo === assetNo); if (!e) return;
+  const m = MM[e.modelId];
+  const loaning = e.status === '대여 중';
+  const stOpts = loaning ? ['대여 중'] : (m.usage === '대여용' ? ['대여 가능', '불용처리'] : ['사용 중', '불용처리']);
+  openModal(`장비 수정 · ${assetNo}`,
+    `<div class="kv"><span><b>${h(modelLabel(m))}</b></span><span>${h(m.usage)}</span><span>만료일 <b>${expiry(m)}</b></span></div>` +
+    fRow('모델', fSel('eModel', DB.models.filter(x => x.type === m.type).map(x => [x.id, `${x.name} · ${x.project} (${x.usage})`]), e.modelId)) +
+    fRow('위치·사용부서', fIn('eLoc', e.location, 'text', 'list="dlDept"')) +
+    (m.usage === '설치' ? fRow('사용자 직책', fIn('ePos', e.position, 'text', 'list="dlPos"')) : '') +
+    fRow('상태', fSel('eSt', stOpts, e.status)) +
+    (loaning ? '<div class="hint">대여 중인 장비는 반납 처리 후 상태를 바꿀 수 있습니다.</div>' : '') +
+    fRow('비고', fIn('eNote', e.note)),
+    () => {
+      e.modelId = gv('eModel'); e.location = gv('eLoc'); ensureDept(e.location); if (document.getElementById('ePos')) e.position = gv('ePos');
+      e.status = gv('eSt'); e.note = gv('eNote');
+      const nm = MM[e.modelId];
+      if (nm.usage === '대여용' && e.status === '사용 중') e.status = '대여 가능';
+      if (nm.usage === '설치' && e.status === '대여 가능') e.status = '사용 중';
+      changed('장비 정보를 저장했습니다.');
+    }, '저장',
+    loaning ? [] : [{
+      label: '장비 삭제', cls: 'danger', fn: () => {
+        if (DB.loans.some(l => l.assetNo === assetNo)) { if (!confirm('이 장비에는 대여 이력이 있습니다. 삭제하면 이력의 장비 정보가 표시되지 않습니다. 계속할까요?')) return; }
+        else if (!confirm('이 장비를 목록에서 삭제할까요? (불용처리는 상태를 "불용처리"로 바꾸세요)')) return;
+        DB.equipment = DB.equipment.filter(x => x !== e); closeModal(); changed('장비를 삭제했습니다.');
+      }
+    }]);
+}
+function addEquipModal(modelId) {
+  if (!DB.models.length) { alert('먼저 장비모델을 등록하세요.'); return; }
+  const opts = DB.models.slice().sort((a, b) => TYPES.indexOf(a.type) - TYPES.indexOf(b.type) || cmp(a.introDate, b.introDate)).map(m => [m.id, `${m.type} · ${m.name} · ${m.project} (${m.usage})`]);
+  openModal('장비 추가',
+    fRow('장비모델', fSel('aModel', opts, modelId || opts[0][0]), true) +
+    fRow('추가 대수', fIn('aCnt', 1, 'number', 'min="1" max="500"'), true) +
+    fRow('자산번호', fIn('aAsset', '', 'text', 'placeholder="비워두면 자동 생성 (1대일 때만 직접 입력)"')) +
+    fRow('위치·사용부서', fIn('aLoc', '', 'text', 'list="dlDept" placeholder="대여용은 비워두면 대여 보관"')) +
+    fRow('사용자 직책', fIn('aPos', '', 'text', 'list="dlPos" placeholder="설치 장비만"')) +
+    fRow('비고', fIn('aNote', '')),
+    () => {
+      const m = MM[gv('aModel')], n = parseInt(gv('aCnt'), 10);
+      if (!(n >= 1 && n <= 500)) return mErr('추가 대수는 1~500 사이로 입력하세요.');
+      const manual = gv('aAsset');
+      if (manual && n !== 1) return mErr('자산번호를 직접 입력할 때는 1대만 추가할 수 있습니다.');
+      if (manual && DB.equipment.some(e => e.assetNo === manual)) return mErr('이미 있는 자산번호입니다.');
+      ensureDept(gv('aLoc'));
+      const PFX = { 노트북: 'NB', PC: 'PC', 모니터: 'MN', 프린터: 'PR' }[m.type] || 'EQ';
+      let maxSeq = 0; DB.equipment.forEach(e => { const mm = /^([A-Z]+)\d{2}-(\d+)$/.exec(e.assetNo); if (mm && mm[1] === PFX) maxSeq = Math.max(maxSeq, +mm[2]); });
+      for (let i = 0; i < n; i++) {
+        const assetNo = manual || `${PFX}${m.introDate.slice(2, 4)}-${String(++maxSeq).padStart(4, '0')}`;
+        DB.equipment.push({ assetNo, modelId: m.id, location: gv('aLoc') || (m.usage === '대여용' ? RENTAL_LOC : ''), position: m.usage === '설치' ? gv('aPos') : '', status: m.usage === '대여용' ? '대여 가능' : '사용 중', note: gv('aNote') });
+      }
+      changed(`${n}대를 추가했습니다.`);
+    }, '추가');
+}
+
+function renderModels() {
+  const t = TODAY();
+  const cnt = {}; DB.equipment.forEach(e => { cnt[e.modelId] = cnt[e.modelId] || { all: 0, live: 0, disp: 0 }; cnt[e.modelId].all++; if (e.status === '불용처리') cnt[e.modelId].disp++; else cnt[e.modelId].live++; });
+  const list = DB.models.slice().sort((a, b) => cmp(a.usage, b.usage) || TYPES.indexOf(a.type) - TYPES.indexOf(b.type) || cmp(a.introDate, b.introDate));
+  const rows = list.map(m => {
+    const c = cnt[m.id] || { all: 0, live: 0, disp: 0 };
+    return `<tr id="md-${h(m.id)}"><td>${h(m.usage)}</td><td>${h(m.type)}</td><td>${h(m.name)}</td><td>${h(m.project)}</td><td>${h(m.introDate)}</td><td class="n">${h(m.life)}년</td><td>${expiry(m)}</td><td>${lifeBadge(lifeStatus(m, t))}</td>
+      <td class="n">${c.live}</td><td class="n">${c.disp}</td>
+      <td><button class="btn sm" onclick="modelModal(${ja(m.id)})">수정</button> <button class="btn sm" onclick="addEquipModal(${ja(m.id)})">장비 추가</button></td></tr>`;
+  }).join('');
+  return `<div class="panel"><div class="filters"><span class="muted">같은 사업으로 들어온 같은 모델은 하나의 장비모델(도입 묶음)로 관리합니다. 사용연한은 장비모델 단위로 판정합니다.</span><div class="spacer"></div><button class="btn primary" onclick="modelModal()">+ 장비모델 추가</button></div>
+  <div class="tablewrap"><table class="t"><thead><tr><th>구분</th><th>종류</th><th>모델명</th><th>도입사업명</th><th>도입일</th><th class="n">사용연한</th><th>만료일</th><th>상태(오늘 기준)</th><th class="n">운영 대수</th><th class="n">불용처리</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+function modelModal(id) {
+  const m = id ? MM[id] : null;
+  openModal(m ? '장비모델 수정' : '장비모델 추가',
+    fRow('장비종류', fSel('mType', TYPES, m ? m.type : '노트북'), true) +
+    fRow('구분', fSel('mUsage', USAGES, m ? m.usage : '대여용'), true) +
+    fRow('모델명', fIn('mName', m ? m.name : ''), true) +
+    fRow('도입사업명', fIn('mProj', m ? m.project : '')) +
+    fRow('도입일', fIn('mIntro', m ? m.introDate : TODAY(), 'date'), true) +
+    fRow('사용연한(년)', fIn('mLife', m ? m.life : 5, 'number', 'min="1" max="30"'), true),
+    () => {
+      const v = { type: gv('mType'), usage: gv('mUsage'), name: gv('mName'), project: gv('mProj'), introDate: gv('mIntro'), life: Number(gv('mLife')) };
+      if (!v.name || !v.introDate || !(v.life > 0)) return mErr('모델명, 도입일, 사용연한을 입력하세요.');
+      if (m) {
+        if (m.usage !== v.usage) DB.equipment.filter(e => e.modelId === m.id).forEach(e => {
+          if (v.usage === '대여용' && e.status === '사용 중') e.status = '대여 가능';
+          if (v.usage === '설치' && e.status === '대여 가능') e.status = '사용 중';
+        });
+        Object.assign(m, v);
+      } else DB.models.push(Object.assign({ id: uid('M') }, v));
+      changed('장비모델을 저장했습니다.');
+    }, '저장',
+    m ? [{
+      label: '모델 삭제', cls: 'danger', fn: () => {
+        if (DB.equipment.some(e => e.modelId === m.id)) { alert('이 모델에 등록된 장비가 있어 삭제할 수 없습니다.'); return; }
+        if (!confirm('이 장비모델을 삭제할까요?')) return;
+        DB.models = DB.models.filter(x => x !== m); closeModal(); changed('장비모델을 삭제했습니다.');
+      }
+    }] : []);
+}
+
+/* =====================================================================
+   ④ 분기 보고
+   ===================================================================== */
+function rpDefault() { const t = TODAY(); return { y: +t.slice(0, 4), q: qOf(t), status: '', type: '', incDisposed: false, view: 'summary' }; }
+function reportData() {
+  const R = S.rp, base = qEnd(R.y, R.q);
+  const all = DB.equipment.filter(e => MM[e.modelId].introDate <= base && (R.incDisposed || e.status !== '불용처리'))
+    .map(e => { const m = MM[e.modelId]; return { e, m, ex: expiry(m), st: lifeStatus(m, base) }; });
+  const counts = { 정상: 0, '구매 소요 확정 대상': 0, '불용 대상': 0 }; all.forEach(r => counts[r.st]++);
+  const rows = all.filter(r => (!R.type || r.m.type === R.type) && (!R.status || r.st === R.status)).sort((a, b) => sortEquip(a.e, b.e));
+  // 총괄: 모델 단위
+  const groups = [];
+  TYPES.forEach(tp => {
+    const byM = {}; const order = [];
+    rows.filter(r => r.m.type === tp).forEach(r => { if (!byM[r.m.id]) { byM[r.m.id] = { m: r.m, ex: r.ex, st: r.st, n: 0 }; order.push(r.m.id); } byM[r.m.id].n++; });
+    if (order.length) groups.push({ type: tp, items: order.map(id => byM[id]), n: order.reduce((s, id) => s + byM[id].n, 0) });
+  });
+  return { base, rows, groups, counts, total: rows.length };
+}
+function renderReport() {
+  if (!S.rp) S.rp = rpDefault();
+  const R = S.rp, t = TODAY();
+  const D = reportData();
+  const years = new Set([+t.slice(0, 4), +t.slice(0, 4) - 1, +t.slice(0, 4) + 1]); DB.models.forEach(m => years.add(+m.introDate.slice(0, 4)));
+  const yOpts = [...years].sort().map(y => [y, `${y}년`]);
+  const exp = DB.settings.reportExports[`${R.y}-${R.q}`];
+  const stCell = st => lifeBadge(st);
+  let table;
+  if (R.view === 'summary') {
+    let body = '';
+    D.groups.forEach(g => {
+      g.items.forEach(it => {
+        body += `<tr id="rm-${h(it.m.id)}"><td>${h(it.m.type)}</td><td>${h(it.m.name)}</td><td>${h(it.m.usage)}</td><td>${h(it.m.project)}</td><td>${h(it.m.introDate)}</td><td class="n">${h(it.m.life)}년</td><td>${it.ex}</td><td class="n">${fmtN(it.n)}</td><td>${stCell(it.st)}</td></tr>`;
+      });
+      body += `<tr class="sub"><td colspan="7">${h(g.type)} 소계</td><td class="n">${fmtN(g.n)}</td><td></td></tr>`;
+    });
+    body += `<tr class="total"><td colspan="7">합계</td><td class="n">${fmtN(D.total)}</td><td></td></tr>`;
+    table = `<div class="tablewrap"><table class="t"><thead><tr><th>장비종류</th><th>모델명</th><th>구분</th><th>도입사업명</th><th>도입일</th><th class="n">사용연한</th><th>만료일</th><th class="n">대수</th><th>상태</th></tr></thead><tbody>${D.total ? body : '<tr><td colspan="9" class="empty">해당 장비가 없습니다.</td></tr>'}</tbody></table></div>`;
+  } else {
+    const body = D.rows.map(r => `<tr><td>${h(r.m.type)}</td><td>${h(r.m.name)}</td><td>${h(r.e.assetNo)}</td><td>${h(r.m.project)}</td><td>${h(r.m.introDate)}</td><td class="n">${h(r.m.life)}년</td><td>${r.ex}</td><td>${stCell(r.st)}</td><td>${h(locOf(r.e))}</td><td>${h(posOf(r.e))}</td></tr>`).join('');
+    table = `<div class="tablewrap"><table class="t"><thead><tr><th>장비종류</th><th>모델명</th><th>자산번호</th><th>도입사업명</th><th>도입일</th><th class="n">사용연한</th><th>만료일</th><th>상태</th><th>위치·사용부서</th><th>사용자 직책</th></tr></thead><tbody>${body || '<tr><td colspan="10" class="empty">해당 장비가 없습니다.</td></tr>'}</tbody></table></div>`;
+  }
+  return `
+  <h2>분기 장비 보고</h2>
+  <div class="panel">
+    <div class="filters">
+      <label>연도</label>${fSel('rpY', yOpts, R.y, `onchange="S.rp.y=+this.value;render()"`)}
+      <label>분기</label>${fSel('rpQ', [[1, '1분기'], [2, '2분기'], [3, '3분기'], [4, '4분기']], R.q, `onchange="S.rp.q=+this.value;render()"`)}
+      <label>상태</label>${fSel('rpSt', [['', '전체'], '구매 소요 확정 대상', '불용 대상', '정상'], R.status, `onchange="S.rp.status=this.value;render()"`)}
+      <label>장비종류</label>${fSel('rpType', [['', '전체'], ...TYPES], R.type, `onchange="S.rp.type=this.value;render()"`)}
+      <label><input type="checkbox" ${R.incDisposed ? 'checked' : ''} onchange="S.rp.incDisposed=this.checked;render()"> 불용처리 완료 장비 포함</label>
+      <div class="spacer"></div>
+      <button class="btn primary" onclick="exportReport()">📥 엑셀 내보내기 (총괄+세부)</button>
+    </div>
+    <div class="kv"><span>보고: <b>${R.y}년 ${R.q}분기 전산장비 현황</b></span><span>기준일 <b>${D.base}</b></span>
+      <span>정상 <b>${fmtN(D.counts['정상'])}</b>대</span><span class="txt-orange">구매 소요 확정 대상 ${fmtN(D.counts['구매 소요 확정 대상'])}대</span><span class="txt-red">불용 대상 ${fmtN(D.counts['불용 대상'])}대</span>
+      <span class="muted">${exp ? `이 분기 마지막 내보내기: ${fmtDT(exp)}` : '이 분기는 아직 내보내지 않음'}</span></div>
+    <div class="subtabs"><button class="${R.view === 'summary' ? 'on' : ''}" onclick="S.rp.view='summary';render()">총괄현황 (모델 단위)</button><button class="${R.view === 'detail' ? 'on' : ''}" onclick="S.rp.view='detail';render()">세부현황 (${fmtN(D.total)}대)</button></div>
+    ${table}
+  </div>`;
+}
+function exportReport() {
+  const R = S.rp, D = reportData();
+  const title = `${R.y}년 ${R.q}분기 전산장비 현황`;
+  const filt = [R.status ? `상태: ${R.status}` : '상태: 전체', R.type ? `장비종류: ${R.type}` : '장비종류: 전체', R.incDisposed ? '불용처리 완료 포함' : '불용처리 완료 제외'].join(' / ');
+  const info = `기준일: ${D.base}    작성: ${fmtDT(new Date().toISOString())} ${WLABEL[worker]}    (${filt})`;
+  const stS = st => st === '불용 대상' ? X.red : st === '구매 소요 확정 대상' ? X.orange : X.center;
+  // 총괄
+  const sh1 = { name: '총괄현황', cols: [10, 26, 8, 30, 12, 9, 12, 9, 20], rows: [], merges: ['A1:I1', 'A2:I2'], freeze: 3, heights: { 0: 28 } };
+  sh1.rows.push([{ v: title, s: X.title }]);
+  sh1.rows.push([{ v: info, s: X.info }]);
+  sh1.rows.push(['장비종류', '모델명', '구분', '도입사업명', '도입일', '사용연한', '만료일', '대수', '상태'].map(v => ({ v, s: X.header })));
+  D.groups.forEach(g => {
+    g.items.forEach(it => sh1.rows.push([{ v: it.m.type, s: X.center }, { v: it.m.name, s: X.cell }, { v: it.m.usage, s: X.center }, { v: it.m.project, s: X.cell }, { v: it.m.introDate, s: X.center }, { v: `${it.m.life}년`, s: X.center }, { v: it.ex, s: X.center }, { v: it.n, s: X.num }, { v: it.st, s: stS(it.st) }]));
+    const r = sh1.rows.length + 1;
+    sh1.rows.push([{ v: `${g.type} 소계`, s: X.sub }, { v: '', s: X.sub }, { v: '', s: X.sub }, { v: '', s: X.sub }, { v: '', s: X.sub }, { v: '', s: X.sub }, { v: '', s: X.sub }, { v: g.n, s: X.subNum }, { v: '', s: X.sub }]);
+    sh1.merges.push(`A${r}:G${r}`);
+  });
+  const tr = sh1.rows.length + 1;
+  sh1.rows.push([{ v: '합계', s: X.total }, { v: '', s: X.total }, { v: '', s: X.total }, { v: '', s: X.total }, { v: '', s: X.total }, { v: '', s: X.total }, { v: '', s: X.total }, { v: D.total, s: X.totalNum }, { v: '', s: X.total }]);
+  sh1.merges.push(`A${tr}:G${tr}`);
+  const cnt = { 정상: 0, '구매 소요 확정 대상': 0, '불용 대상': 0 }; D.rows.forEach(r => cnt[r.st]++);
+  sh1.rows.push([]);
+  sh1.rows.push([{ v: '상태별 합계', s: X.bold }]);
+  ['구매 소요 확정 대상', '불용 대상', '정상'].forEach(st => sh1.rows.push([{ v: st, s: stS(st) }, { v: cnt[st], s: X.num }]));
+  sh1.rows.push([{ v: '※ 구매 소요 확정 대상: 기준일 ≤ 만료일 ≤ 기준일+1년 / 불용 대상: 기준일 > 만료일 / 만료일 = 도입일 + 사용연한', s: X.info }]);
+  // 세부
+  const sh2 = { name: '세부현황', cols: [10, 26, 13, 30, 12, 9, 12, 20, 26, 12], rows: [], merges: ['A1:J1', 'A2:J2'], freeze: 3, heights: { 0: 28 } };
+  sh2.rows.push([{ v: title + ' (세부)', s: X.title }]);
+  sh2.rows.push([{ v: info, s: X.info }]);
+  sh2.rows.push(['장비종류', '모델명', '자산번호', '도입사업명', '도입일', '사용연한', '만료일', '상태', '위치·사용부서', '사용자 직책'].map(v => ({ v, s: X.header })));
+  D.rows.forEach(r => sh2.rows.push([{ v: r.m.type, s: X.center }, { v: r.m.name, s: X.cell }, { v: r.e.assetNo, s: X.center }, { v: r.m.project, s: X.cell }, { v: r.m.introDate, s: X.center }, { v: `${r.m.life}년`, s: X.center }, { v: r.ex, s: X.center }, { v: r.st, s: stS(r.st) }, { v: locOf(r.e), s: X.cell }, { v: posOf(r.e), s: X.center }]));
+  sh2.rows.push([{ v: `총 ${D.rows.length}대`, s: X.bold }]);
+  download(buildXlsx([sh1, sh2]), `${R.y}년_${R.q}분기_전산장비현황_${stamp()}.xlsx`);
+  DB.settings.reportExports[`${R.y}-${R.q}`] = new Date().toISOString();
+  changed('엑셀 파일을 내려받았습니다. 내보내기 이력이 기록되었습니다.');
+}
+
+/* =====================================================================
+   ③ 소모품
+   ===================================================================== */
+function sortedLogs() { return DB.stockLogs.slice().sort((a, b) => cmp(a.date, b.date)); }
+function stockMap(upto) {
+  const s = {}; DB.consumables.forEach(c => s[c.id] = Number(c.initialStock) || 0);
+  sortedLogs().forEach(l => {
+    if (upto && l.date > upto) return; if (!(l.consumableId in s)) return;
+    if (l.kind === '입고') s[l.consumableId] += l.qty; else if (l.kind === '불출') s[l.consumableId] -= l.qty; else if (l.kind === '실사보정') s[l.consumableId] = l.qty;
+  });
+  return s;
+}
+function sumOut(cid, from, to) { let n = 0; DB.stockLogs.forEach(l => { if (l.consumableId === cid && l.kind === '불출' && l.date >= from && l.date <= to) n += l.qty; }); return n; }
+function printerNames() { return [...new Set(DB.models.filter(m => m.type === '프린터').map(m => m.name))].sort(); }
+function printerUnits(name, y) {
+  // 운영 대수: 올해 안에 불용 대상이 되는 장비 제외 (불용처리 완료 장비도 제외)
+  const yEnd = `${y}-12-31`, yStart = `${y}-01-01`;
+  const eq = DB.equipment.filter(e => { const m = MM[e.modelId]; return m.type === '프린터' && m.name === name && m.introDate <= yEnd; });
+  const live = eq.filter(e => e.status !== '불용처리');
+  const op = live.filter(e => expiry(MM[e.modelId]) > yEnd).length;
+  const lyEnd = `${y - 1}-12-31`, lyStart = `${y - 1}-01-01`;
+  const ly = DB.equipment.filter(e => { const m = MM[e.modelId]; return m.type === '프린터' && m.name === name && m.introDate <= lyEnd && expiry(m) >= lyStart; }).length;
+  return { op, excluded: live.length - op, ly };
+}
+function csLabel(c) { return `${c.printerModel} · ${c.kind} · ${c.name}`; }
+function sortCs(a, b) { return cmp(a.printerModel, b.printerModel) || CS_KINDS.indexOf(a.kind) - CS_KINDS.indexOf(b.kind) || cmp(a.name, b.name); }
+
+function renderCons() {
+  const tabs = [['stock', '소모품 재고'], ['logs', '입출고 기록'], ['waste', '폐토너 관리'], ['cmp', '소모량 비교'], ['plan', '분기 구매 소요표']];
+  const sub = `<div class="subtabs">${tabs.map(([k, l]) => `<button class="${S.csTab === k ? 'on' : ''}" onclick="S.csTab='${k}';render()">${l}</button>`).join('')}</div>`;
+  const body = { stock: renderStock, logs: renderLogs, waste: renderWaste, cmp: renderCmp, plan: renderPlan }[S.csTab]();
+  return `<h2>소모품 (운영용품)</h2>${sub}${body}`;
+}
+function renderStock() {
+  const st = stockMap(), t = TODAY(), Y = +t.slice(0, 4);
+  const list = DB.consumables.slice().sort(sortCs);
+  const rows = list.map(c => {
+    const s = st[c.id], ty = sumOut(c.id, `${Y}-01-01`, t), me = monthsElapsed(t), avg = me > 0 ? ty / me : 0;
+    const months = avg > 0 ? s / avg : Infinity;
+    const warn = s <= 0 ? '<span class="badge b-red">재고 없음</span>' : months < 12 - me ? `<span class="badge b-orange">연말 전 소진 예상 (${fmt1(months)}개월)</span>` : '';
+    return `<tr id="cs-${h(c.id)}"><td>${h(c.printerModel)}</td><td>${h(c.kind)}</td><td>${h(c.name)}</td><td class="n">${fmtN(c.price)}</td><td class="n"><b>${fmtN(s)}</b></td><td class="n">${fmt1(avg)}</td><td>${warn}</td>
+    <td><button class="btn sm" onclick="logModal('입고',${ja(c.id)})">입고</button> <button class="btn sm primary" onclick="logModal('불출',${ja(c.id)})">불출</button> <button class="btn sm" onclick="logModal('실사보정',${ja(c.id)})">실사</button> <button class="btn sm" onclick="csModal(${ja(c.id)})">수정</button></td></tr>`;
+  }).join('');
+  return `<div class="panel"><div class="filters"><span class="muted">현재 재고 = 최초 재고 + 입고 − 불출 (실사보정 시 그 수량으로 맞춤). 자동 계산됩니다.</span><div class="spacer"></div>
+    <button class="btn" onclick="logModal('입고')">+ 입고 기록</button><button class="btn primary" onclick="logModal('불출')">+ 불출 기록</button><button class="btn" onclick="logModal('실사보정')">실사 보정</button><button class="btn" onclick="csModal()">+ 소모품 등록</button><button class="btn" onclick="exportStock()">📥 현재고 엑셀</button></div>
+  <div class="tablewrap"><table class="t"><thead><tr><th>대응 프린터 모델</th><th>종류</th><th>품명</th><th class="n">단가(원)</th><th class="n">현재 재고</th><th class="n">올해 월평균 불출</th><th>상태</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="empty">등록된 소모품이 없습니다.</td></tr>'}</tbody></table></div></div>`;
+}
+function csModal(id) {
+  const c = id ? DB.consumables.find(x => x.id === id) : null;
+  const pn = printerNames();
+  if (!pn.length) { alert('먼저 프린터 장비모델을 등록하세요.'); return; }
+  openModal(c ? '소모품 수정' : '소모품 등록',
+    fRow('대응 프린터 모델', fSel('cPm', pn, c ? c.printerModel : pn[0]), true) +
+    `<div class="hint">같은 모델명의 여러 도입 묶음에 공통 적용됩니다.</div>` +
+    fRow('종류', fSel('cKind', CS_KINDS, c ? c.kind : '토너'), true) +
+    fRow('품명', fIn('cName', c ? c.name : ''), true) +
+    fRow('단가(원)', fIn('cPrice', c ? c.price : '', 'number', 'min="0"'), true) +
+    fRow('최초 재고', fIn('cInit', c ? c.initialStock : 0, 'number', 'min="0"'), true) +
+    fRow('등록일', fIn('cReg', c ? (c.registeredDate || '') : TODAY(), 'date')),
+    () => {
+      const v = { printerModel: gv('cPm'), kind: gv('cKind'), name: gv('cName'), price: Number(gv('cPrice')), initialStock: Number(gv('cInit')), registeredDate: gv('cReg') };
+      if (!v.name) return mErr('품명을 입력하세요.');
+      if (!(v.price >= 0) || gv('cPrice') === '') return mErr('단가를 입력하세요.');
+      if (!(v.initialStock >= 0)) return mErr('최초 재고는 0 이상이어야 합니다.');
+      if (c) Object.assign(c, v); else DB.consumables.push(Object.assign({ id: uid('C') }, v));
+      changed('소모품을 저장했습니다.');
+    }, '저장',
+    c ? [{
+      label: '소모품 삭제', cls: 'danger', fn: () => {
+        const n = DB.stockLogs.filter(l => l.consumableId === c.id).length;
+        if (!confirm(`이 소모품을 삭제할까요?${n ? `\n관련 입출고 기록 ${n}건도 함께 삭제됩니다.` : ''}`)) return;
+        DB.consumables = DB.consumables.filter(x => x !== c); DB.stockLogs = DB.stockLogs.filter(l => l.consumableId !== c.id); DB.wasteLogs = DB.wasteLogs.filter(l => l.consumableId !== c.id);
+        closeModal(); changed('소모품을 삭제했습니다.');
+      }
+    }] : []);
+}
+function logModal(kind, cid) {
+  if (!DB.consumables.length) { alert('먼저 소모품을 등록하세요.'); return; }
+  const st = stockMap();
+  const opts = DB.consumables.slice().sort(sortCs).map(c => [c.id, `${csLabel(c)} (재고 ${st[c.id]})`]);
+  const t = TODAY();
+  const title = { 입고: '입고 기록', 불출: '불출 기록', 실사보정: '실사 보정 (분기 재산조사)' }[kind];
+  openModal(title,
+    fRow('일자', fIn('gDate', t, 'date'), true) +
+    fRow('소모품', fSel('gCs', opts, cid || opts[0][0], 'onchange="logHint()"'), true) +
+    `<div class="hint" id="gStock"></div>` +
+    fRow(kind === '실사보정' ? '실제 수량' : '수량', fIn('gQty', kind === '실사보정' ? '' : 1, 'number', `min="${kind === '실사보정' ? 0 : 1}" oninput="logHint()"`), true) +
+    (kind === '불출' ? fRow('수령부서', fIn('gDept', '', 'text', 'list="dlDept"'), true) +
+      `<div id="gRetRow" style="display:none">${fRow('폐토너 반납 수량', fIn('gRet', 1, 'number', 'min="0" oninput="this.dataset.touched=1;logHint()"'), true)}<div class="hint">토너는 1대1 교환 원칙: 불출 수량만큼 폐토너를 반납받습니다.</div></div>` : '') +
+    fRow(kind === '불출' ? '불출 담당자' : '담당자', workerSel('gHand'), true) +
+    fRow('비고', fIn('gNote', '')) + `<div id="gWarn"></div>`,
+    () => {
+      const date = gv('gDate'), c = DB.consumables.find(x => x.id === gv('gCs')), qty = Number(gv('gQty'));
+      if (!date) return mErr('일자를 입력하세요.');
+      if (gv('gQty') === '' || !Number.isInteger(qty) || qty < (kind === '실사보정' ? 0 : 1)) return mErr(kind === '실사보정' ? '실제 수량을 0 이상의 정수로 입력하세요.' : '수량을 1 이상의 정수로 입력하세요.');
+      const rec = { id: uid('L'), consumableId: c.id, kind, date, qty, dept: '', handler: gv('gHand'), note: gv('gNote') };
+      if (kind === '불출') {
+        rec.dept = gv('gDept'); if (!rec.dept) return mErr('수령부서를 입력하세요.');
+        if (isToner(c)) {
+          const ret = Number(gv('gRet'));
+          if (gv('gRet') === '' || !Number.isInteger(ret) || ret < 0 || ret > qty) return mErr(`폐토너 반납 수량은 0~${qty} 사이의 정수로 입력하세요.`);
+          rec.returnQty = ret;
+          if (ret < qty && !confirm(`폐토너 ${qty - ret}개가 미반납으로 기록됩니다.\n나중에 [폐토너 관리]에서 추가 회수로 처리할 수 있습니다. 계속할까요?`)) return false;
+        }
+        const s = stockMap(date)[c.id];
+        if (qty > s && !confirm(`⚠ 재고 부족 경고\n\n${c.name}의 재고는 ${s}개인데 ${qty}개를 불출하려고 합니다.\n그래도 기록할까요? (재고가 음수가 됩니다)`)) return false;
+      }
+      if (kind === '실사보정') { const before = stockMap(date)[c.id]; rec.before = before; rec.diff = qty - before; rec.note = rec.note || `장부 ${before} → 실사 ${qty} (차이 ${qty - before >= 0 ? '+' : ''}${qty - before})`; }
+      DB.stockLogs.push(rec); ensureDept(rec.dept);
+      changed(`${kind} 기록을 저장했습니다.`);
+    }, '기록');
+  logHint();
+}
+function logHint() {
+  const el = document.getElementById('gStock'); if (!el) return;
+  const cid = gv('gCs'), s = stockMap()[cid], q = Number(document.getElementById('gQty').value);
+  el.textContent = `현재 재고: ${s}개`;
+  const w = document.getElementById('gWarn');
+  const isOut = !!document.getElementById('gDept');
+  let warn = isOut && q > s ? `<div class="warnbox">⚠ 재고(${s}개)보다 많이 불출하려고 합니다.</div>` : '';
+  const rr = document.getElementById('gRetRow');
+  if (rr) {
+    const toner = isToner(DB.consumables.find(c => c.id === cid));
+    rr.style.display = toner ? '' : 'none';
+    const ri = document.getElementById('gRet');
+    if (toner && !ri.dataset.touched) ri.value = q > 0 ? q : 0;
+    const r = Number(ri.value);
+    if (toner && r < q) warn += `<div class="warnbox">폐토너 미반납 ${q - r}개로 기록됩니다.</div>`;
+  }
+  w.innerHTML = warn;
+}
+function renderLogs() {
+  const f = S.lf, csMap = {}; DB.consumables.forEach(c => csMap[c.id] = c);
+  const years = [...new Set(DB.stockLogs.map(l => l.date.slice(0, 4)))].sort().reverse();
+  const list = sortData('csLogs', DB.stockLogs.filter(l => (!f.kind || l.kind === f.kind) && (!f.cid || l.consumableId === f.cid) && (!f.year || l.date.startsWith(f.year)))
+    .slice().sort((a, b) => cmp(b.date, a.date)), l => { const c = csMap[l.consumableId] || {}; return [l.date, l.kind, c.printerModel, c.name, l.kind === '불출' ? -l.qty : l.qty, l.dept, WLABEL[l.handler], (l.kind === '불출' && isToner(c) ? `폐토너 반납 ${retQty(l)} ` : '') + (l.note || '')]; });
+  const pages = Math.max(1, Math.ceil(list.length / PAGE)); if (S.lPage >= pages) S.lPage = pages - 1;
+  const rows = list.slice(S.lPage * PAGE, S.lPage * PAGE + PAGE).map(l => {
+    const c = csMap[l.consumableId] || { name: '(삭제됨)', printerModel: '' };
+    const kb = l.kind === '입고' ? 'b-green' : l.kind === '불출' ? 'b-blue' : 'b-orange';
+    const qty = l.kind === '입고' ? `+${l.qty}` : l.kind === '불출' ? `−${l.qty}` : `→ ${l.qty} (${l.diff >= 0 ? '+' : ''}${l.diff})`;
+    return `<tr><td>${h(l.date)}</td><td><span class="badge ${kb}">${h(l.kind)}</span></td><td>${h(c.printerModel)}</td><td>${h(c.name)}</td><td class="n">${qty}</td><td>${h(l.dept || '')}</td><td class="c">${h(WLABEL[l.handler] || '')}</td><td class="muted">${l.kind === '불출' && isToner(c) ? (retQty(l) < l.qty ? `<span class="txt-red">폐토너 반납 ${retQty(l)} (미반납 ${l.qty - retQty(l)})</span> ` : `폐토너 반납 ${retQty(l)} `) : ''}${h(l.note || '')}</td>
+      <td><button class="btn sm danger" onclick="delLog(${ja(l.id)})">삭제</button></td></tr>`;
+  }).join('');
+  const sumIn = list.filter(l => l.kind === '입고').reduce((s, l) => s + l.qty, 0), sumOutN = list.filter(l => l.kind === '불출').reduce((s, l) => s + l.qty, 0);
+  return `<div class="panel"><div class="filters">
+    <label>구분</label>${fSel('lfKind', [['', '전체'], '입고', '불출', '실사보정'], f.kind, `onchange="S.lf.kind=this.value;S.lPage=0;render()"`)}
+    <label>소모품</label>${fSel('lfCs', [['', '전체'], ...DB.consumables.slice().sort(sortCs).map(c => [c.id, csLabel(c)])], f.cid, `onchange="S.lf.cid=this.value;S.lPage=0;render()"`)}
+    <label>연도</label>${fSel('lfY', [['', '전체'], ...years], f.year, `onchange="S.lf.year=this.value;S.lPage=0;render()"`)}
+    <span class="muted">${fmtN(list.length)}건 · 입고 ${fmtN(sumIn)} · 불출 ${fmtN(sumOutN)}</span><div class="spacer"></div>
+    <button class="btn" onclick="logModal('입고')">+ 입고</button><button class="btn primary" onclick="logModal('불출')">+ 불출</button><button class="btn" onclick="logModal('실사보정')">실사 보정</button></div>
+  <div class="tablewrap"><table class="t" data-sort="csLogs"><thead><tr><th>일자</th><th>구분</th><th>프린터 모델</th><th>품명</th><th class="n">수량</th><th>수령부서</th><th class="c">담당자</th><th>비고</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="9" class="empty">기록이 없습니다.</td></tr>'}</tbody></table></div>
+  <div class="pager"><button class="btn sm" ${S.lPage <= 0 ? 'disabled' : ''} onclick="S.lPage--;render()">◀ 이전</button> ${S.lPage + 1} / ${pages} 페이지 <button class="btn sm" ${S.lPage >= pages - 1 ? 'disabled' : ''} onclick="S.lPage++;render()">다음 ▶</button></div></div>`;
+}
+function delLog(id) {
+  const l = DB.stockLogs.find(x => x.id === id); if (!l) return;
+  if (!confirm(`${l.date} ${l.kind} ${l.qty}개 기록을 삭제할까요? 재고가 다시 계산됩니다.`)) return;
+  DB.stockLogs = DB.stockLogs.filter(x => x !== l); changed('기록을 삭제했습니다.');
+}
+/* ---------- 폐토너 관리 (토너 1대1 교환) ---------- */
+const isToner = c => !!c && c.kind === '토너';
+const retQty = l => l.returnQty != null ? Number(l.returnQty) : l.qty; // 예전 파일: 반납 수량이 없으면 1대1로 간주
+function wasteStats(year) {
+  const m = {};
+  DB.consumables.filter(isToner).forEach(c => m[c.id] = { c, issued: 0, returned: 0, extra: 0, processed: 0, retY: 0, procY: 0 });
+  DB.stockLogs.forEach(l => {
+    const s = m[l.consumableId]; if (!s || l.kind !== '불출') return;
+    s.issued += l.qty; s.returned += retQty(l); if (l.date.startsWith(year)) s.retY += retQty(l);
+  });
+  DB.wasteLogs.forEach(w => {
+    const s = m[w.consumableId]; if (!s) return;
+    if (w.kind === '추가회수') { s.extra += w.qty; if (w.date.startsWith(year)) s.retY += w.qty; }
+    else if (w.kind === '처리') { s.processed += w.qty; if (w.date.startsWith(year)) s.procY += w.qty; }
+  });
+  Object.values(m).forEach(s => { s.stored = s.returned + s.extra - s.processed; s.unreturned = Math.max(0, s.issued - s.returned - s.extra); });
+  return m;
+}
+function unreturnedList() {
+  const m = {};
+  const key = (cid, dept) => cid + '|' + dept;
+  DB.stockLogs.forEach(l => {
+    const c = DB.consumables.find(x => x.id === l.consumableId);
+    if (l.kind !== '불출' || !isToner(c) || retQty(l) >= l.qty) return;
+    const k = key(l.consumableId, l.dept); m[k] = m[k] || { c, dept: l.dept, n: 0, last: '' };
+    m[k].n += l.qty - retQty(l); if (l.date > m[k].last) m[k].last = l.date;
+  });
+  DB.wasteLogs.forEach(w => { if (w.kind !== '추가회수') return; const k = key(w.consumableId, w.dept); if (m[k]) m[k].n -= w.qty; });
+  return Object.values(m).filter(x => x.n > 0).sort((a, b) => cmp(a.last, b.last));
+}
+function renderWaste() {
+  const t = TODAY(), Y = t.slice(0, 4);
+  const st = wasteStats(Y), list = Object.values(st).sort((a, b) => sortCs(a.c, b.c));
+  if (!list.length) return `<div class="panel"><div class="empty">종류가 "토너"인 소모품이 없습니다. 소모품 재고 화면에서 토너를 등록하세요.</div></div>`;
+  const sum = k => list.reduce((s, x) => s + x[k], 0);
+  const un = unreturnedList();
+  const rows = list.map(s => `<tr id="wt-${h(s.c.id)}"><td>${h(s.c.printerModel)}</td><td>${h(s.c.name)}</td><td class="n">${fmtN(s.issued)}</td><td class="n">${fmtN(s.returned)}</td><td class="n">${fmtN(s.extra)}</td><td class="n">${fmtN(s.processed)}</td>
+    <td class="n"><b>${fmtN(s.stored)}</b></td><td class="n">${s.unreturned ? `<span class="txt-red">${fmtN(s.unreturned)}</span>` : '0'}</td>
+    <td><button class="btn sm primary" ${s.stored > 0 ? '' : 'disabled'} onclick="wasteModal('처리',${ja(s.c.id)})">처리(반출)</button> <button class="btn sm" onclick="wasteModal('추가회수',${ja(s.c.id)})">추가 회수</button></td></tr>`).join('');
+  const unRows = un.map(x => `<tr><td>${h(x.dept)}</td><td>${h(x.c.printerModel)}</td><td>${h(x.c.name)}</td><td class="n txt-red">${x.n}</td><td>${h(x.last)}</td><td class="n">${diffDays(x.last, t)}일</td>
+    <td><button class="btn sm primary" onclick="wasteModal('추가회수',${ja(x.c.id)},${ja(x.dept)})">회수 기록</button></td></tr>`).join('');
+  // 이력: 불출 시 교환 반납 + 추가 회수 + 처리
+  const csMap = {}; DB.consumables.forEach(c => csMap[c.id] = c);
+  let hist = [];
+  DB.stockLogs.forEach(l => { const c = csMap[l.consumableId]; if (l.kind === '불출' && isToner(c)) hist.push({ date: l.date, kind: '교환 반납', c, qty: retQty(l), where: l.dept, handler: l.handler, note: `불출 ${l.qty}개${retQty(l) < l.qty ? ` · 미반납 ${l.qty - retQty(l)}` : ''}` }); });
+  DB.wasteLogs.forEach(w => hist.push({ id: w.id, date: w.date, kind: w.kind === '처리' ? '처리(반출)' : '추가 회수', c: csMap[w.consumableId] || { name: '(삭제됨)', printerModel: '' }, qty: w.qty, where: w.kind === '처리' ? w.vendor : w.dept, handler: w.handler, note: w.note }));
+  const years = [...new Set(hist.map(x => x.date.slice(0, 4)))].sort().reverse();
+  hist = hist.filter(x => (!S.wf.year || x.date.startsWith(S.wf.year)) && (!S.wf.kind || x.kind === S.wf.kind)).sort((a, b) => cmp(b.date, a.date));
+  hist = sortData('wasteHist', hist, x => [x.date, x.kind, x.c.printerModel, x.c.name, x.kind === '처리(반출)' ? -x.qty : x.qty, x.where, WLABEL[x.handler], x.note]);
+  const pages = Math.max(1, Math.ceil(hist.length / PAGE)); if (S.wPage >= pages) S.wPage = pages - 1;
+  const hRows = hist.slice(S.wPage * PAGE, S.wPage * PAGE + PAGE).map(x => {
+    const kb = x.kind === '처리(반출)' ? 'b-gray' : x.kind === '추가 회수' ? 'b-orange' : 'b-green';
+    const sign = x.kind === '처리(반출)' ? '−' : '+';
+    return `<tr><td>${h(x.date)}</td><td><span class="badge ${kb}">${h(x.kind)}</span></td><td>${h(x.c.printerModel)}</td><td>${h(x.c.name)}</td><td class="n">${sign}${x.qty}</td><td>${h(x.where || '')}</td><td class="c">${h(WLABEL[x.handler] || '')}</td><td class="muted">${h(x.note || '')}</td>
+      <td>${x.id ? `<button class="btn sm danger" onclick="delWaste(${ja(x.id)})">삭제</button>` : '<span class="muted">불출 기록 연동</span>'}</td></tr>`;
+  }).join('');
+  return `
+  <div class="cards">
+    <div class="card"><div class="k">보관 중 폐토너</div><div class="v">${fmtN(sum('stored'))}개</div><div class="muted">반출(처리) 대기</div></div>
+    <div class="card green"><div class="k">${Y}년 회수</div><div class="v">${fmtN(sum('retY'))}개</div></div>
+    <div class="card"><div class="k">${Y}년 처리(반출)</div><div class="v">${fmtN(sum('procY'))}개</div></div>
+    <div class="card red"><div class="k">미반납 (교환 안 됨)</div><div class="v">${fmtN(sum('unreturned'))}개</div><div class="muted">${un.length}건 (부서·품목별)</div></div>
+  </div>
+  <div class="panel"><div class="filters"><h3 style="margin:0">폐토너 보관 현황</h3><span class="muted">토너는 1대1 교환 원칙 — 불출할 때 같은 수량의 폐토너를 반납받아 자동으로 보관 수량에 더합니다.</span><div class="spacer"></div>
+      <button class="btn" onclick="wasteModal('추가회수')">+ 추가 회수</button><button class="btn primary" onclick="wasteModal('처리')">+ 처리(반출) 기록</button><button class="btn" onclick="exportWaste()">📥 엑셀 내보내기</button></div>
+    <div class="tablewrap"><table class="t"><thead><tr><th>프린터 모델</th><th>품명</th><th class="n">누적 불출</th><th class="n">불출 시 반납</th><th class="n">추가 회수</th><th class="n">처리(반출)</th><th class="n">보관 중</th><th class="n">미반납</th><th></th></tr></thead>
+    <tbody>${rows}<tr class="total"><td colspan="2">합계</td><td class="n">${fmtN(sum('issued'))}</td><td class="n">${fmtN(sum('returned'))}</td><td class="n">${fmtN(sum('extra'))}</td><td class="n">${fmtN(sum('processed'))}</td><td class="n">${fmtN(sum('stored'))}</td><td class="n">${fmtN(sum('unreturned'))}</td><td></td></tr></tbody></table></div></div>
+  <div class="panel"><h3>미반납 현황 <span class="muted">불출했지만 폐토너를 아직 반납받지 못한 부서</span></h3>
+    <div class="tablewrap"><table class="t"><thead><tr><th>부서</th><th>프린터 모델</th><th>품명</th><th class="n">미반납</th><th>최근 불출일</th><th class="n">경과</th><th></th></tr></thead>
+    <tbody>${unRows || '<tr><td colspan="7" class="empty">미반납 폐토너가 없습니다. 모두 1대1로 교환되었습니다.</td></tr>'}</tbody></table></div></div>
+  <div class="panel"><h3>회수·처리 이력</h3>
+    <div class="filters"><label>연도</label>${fSel('wfY', [['', '전체'], ...years], S.wf.year, `onchange="S.wf.year=this.value;S.wPage=0;render()"`)}
+      <label>구분</label>${fSel('wfK', [['', '전체'], '교환 반납', '추가 회수', '처리(반출)'], S.wf.kind, `onchange="S.wf.kind=this.value;S.wPage=0;render()"`)}
+      <span class="muted">${fmtN(hist.length)}건</span></div>
+    <div class="tablewrap"><table class="t" data-sort="wasteHist"><thead><tr><th>일자</th><th>구분</th><th>프린터 모델</th><th>품명</th><th class="n">수량</th><th>부서 / 처리처</th><th class="c">담당자</th><th>비고</th><th></th></tr></thead>
+    <tbody>${hRows || '<tr><td colspan="9" class="empty">기록이 없습니다.</td></tr>'}</tbody></table></div>
+    <div class="pager"><button class="btn sm" ${S.wPage <= 0 ? 'disabled' : ''} onclick="S.wPage--;render()">◀ 이전</button> ${S.wPage + 1} / ${pages} 페이지 <button class="btn sm" ${S.wPage >= pages - 1 ? 'disabled' : ''} onclick="S.wPage++;render()">다음 ▶</button></div></div>`;
+}
+function wasteModal(kind, cid, dept) {
+  const st = wasteStats(TODAY().slice(0, 4));
+  const toners = DB.consumables.filter(isToner).sort(sortCs);
+  if (!toners.length) { alert('토너 종류 소모품이 없습니다.'); return; }
+  const t = TODAY();
+  if (kind === '처리') {
+    const total = toners.reduce((s, c) => s + Math.max(0, st[c.id].stored), 0);
+    if (!total) { alert('보관 중인 폐토너가 없습니다.'); return; }
+    const opts = [['__all', `보관 중 전체 일괄 처리 (${total}개)`], ...toners.filter(c => st[c.id].stored > 0).map(c => [c.id, `${csLabel(c)} (보관 ${st[c.id].stored})`])];
+    openModal('폐토너 처리(반출) 기록',
+      fRow('일자', fIn('wDate', t, 'date'), true) +
+      fRow('대상', fSel('wCs', opts, cid && st[cid] && st[cid].stored > 0 ? cid : '__all', 'onchange="wasteHint()"'), true) +
+      `<div id="wQtyRow">${fRow('수량', fIn('wQty', 1, 'number', 'min="1"'), true)}</div>` +
+      fRow('처리처', fIn('wVendor', '재활용 업체 수거', 'text', 'list="dlVendor"'), true) +
+      `<datalist id="dlVendor"><option value="재활용 업체 수거"><option value="제조사 회수"><option value="폐기물 처리"></datalist>` +
+      fRow('담당자', workerSel('wHand'), true) + fRow('비고', fIn('wNote', '')),
+      () => {
+        const date = gv('wDate'), sel = gv('wCs'), vendor = gv('wVendor');
+        if (!date) return mErr('일자를 입력하세요.'); if (!vendor) return mErr('처리처를 입력하세요.');
+        const base = { kind: '처리', date, dept: '', vendor, handler: gv('wHand'), note: gv('wNote') };
+        if (sel === '__all') {
+          let n = 0;
+          toners.forEach(c => { const q = st[c.id].stored; if (q > 0) { DB.wasteLogs.push(Object.assign({ id: uid('W'), consumableId: c.id, qty: q }, base)); n += q; } });
+          changed(`폐토너 ${n}개 처리(반출)를 기록했습니다.`);
+        } else {
+          const q = Number(gv('wQty'));
+          if (!Number.isInteger(q) || q < 1) return mErr('수량을 1 이상의 정수로 입력하세요.');
+          if (q > st[sel].stored) return mErr(`보관 중인 수량(${st[sel].stored}개)보다 많이 처리할 수 없습니다.`);
+          DB.wasteLogs.push(Object.assign({ id: uid('W'), consumableId: sel, qty: q }, base));
+          changed(`폐토너 ${q}개 처리(반출)를 기록했습니다.`);
+        }
+      }, '기록');
+    wasteHint();
+  } else {
+    openModal('폐토너 추가 회수 (미반납분)',
+      fRow('일자', fIn('wDate', t, 'date'), true) +
+      fRow('토너', fSel('wCs', toners.map(c => [c.id, csLabel(c)]), cid || toners[0].id), true) +
+      fRow('반납 부서', fIn('wDept', dept || '', 'text', 'list="dlDept"'), true) +
+      fRow('수량', fIn('wQty', 1, 'number', 'min="1"'), true) +
+      fRow('담당자', workerSel('wHand'), true) + fRow('비고', fIn('wNote', '')),
+      () => {
+        const date = gv('wDate'), q = Number(gv('wQty')), d = gv('wDept');
+        if (!date) return mErr('일자를 입력하세요.'); if (!d) return mErr('반납 부서를 입력하세요.');
+        if (!Number.isInteger(q) || q < 1) return mErr('수량을 1 이상의 정수로 입력하세요.');
+        DB.wasteLogs.push({ id: uid('W'), consumableId: gv('wCs'), kind: '추가회수', date, qty: q, dept: d, vendor: '', handler: gv('wHand'), note: gv('wNote') }); ensureDept(d);
+        changed(`폐토너 ${q}개 추가 회수를 기록했습니다.`);
+      }, '기록');
+  }
+}
+function wasteHint() { const r = document.getElementById('wQtyRow'); if (r) r.style.display = gv('wCs') === '__all' ? 'none' : ''; }
+function delWaste(id) {
+  const w = DB.wasteLogs.find(x => x.id === id); if (!w) return;
+  if (!confirm(`${w.date} ${w.kind === '처리' ? '처리(반출)' : '추가 회수'} ${w.qty}개 기록을 삭제할까요?`)) return;
+  DB.wasteLogs = DB.wasteLogs.filter(x => x !== w); changed('기록을 삭제했습니다.');
+}
+function exportWaste() {
+  const t = TODAY(), Y = t.slice(0, 4), st = wasteStats(Y), list = Object.values(st).sort((a, b) => sortCs(a.c, b.c)), un = unreturnedList();
+  const sh = { name: '폐토너현황', cols: [24, 30, 11, 12, 11, 12, 11, 11, 11, 11], rows: [], merges: ['A1:J1', 'A2:J2'], freeze: 3, heights: { 0: 28 } };
+  sh.rows.push([{ v: `폐토너 관리 현황 (${t} 기준)`, s: X.title }]);
+  sh.rows.push([{ v: `작성: ${fmtDT(new Date().toISOString())} ${WLABEL[worker]}    ※ 토너 1대1 교환 원칙: 불출 수량만큼 폐토너 반납`, s: X.info }]);
+  sh.rows.push(['프린터 모델', '품명', '누적 불출', '불출 시 반납', '추가 회수', '처리(반출)', '보관 중', '미반납', `${Y}년 회수`, `${Y}년 처리`].map(v => ({ v, s: X.header })));
+  list.forEach(s => sh.rows.push([{ v: s.c.printerModel, s: X.cell }, { v: s.c.name, s: X.cell }, ...['issued', 'returned', 'extra', 'processed', 'stored'].map(k => ({ v: s[k], s: X.num })), { v: s.unreturned, s: s.unreturned ? X.red : X.num }, { v: s.retY, s: X.num }, { v: s.procY, s: X.num }]));
+  const r = sh.rows.length + 1;
+  sh.rows.push([{ v: '합계', s: X.total }, { v: '', s: X.total }, ...['issued', 'returned', 'extra', 'processed', 'stored', 'unreturned', 'retY', 'procY'].map(k => ({ v: list.reduce((a, s) => a + s[k], 0), s: X.totalNum }))]);
+  sh.merges.push(`A${r}:B${r}`);
+  sh.rows.push([]);
+  sh.rows.push([{ v: '미반납 현황', s: X.bold }]);
+  sh.rows.push(['부서', '프린터 모델', '품명', '미반납', '최근 불출일'].map(v => ({ v, s: X.header })));
+  if (un.length) un.forEach(x => sh.rows.push([{ v: x.dept, s: X.cell }, { v: x.c.printerModel, s: X.cell }, { v: x.c.name, s: X.cell }, { v: x.n, s: X.num }, { v: x.last, s: X.center }]));
+  else sh.rows.push([{ v: '미반납 없음', s: X.cell }]);
+  download(buildXlsx([sh]), `폐토너현황_${stamp()}.xlsx`);
+  toast('폐토너 현황 엑셀을 내려받았습니다.');
+}
+
+function renderCmp() {
+  const t = TODAY(); const Y = S.cmpYear || +t.slice(0, 4);
+  const ref = Y === +t.slice(0, 4) ? t : `${Y}-12-31`;
+  const lyRef = addYears(ref, -1);
+  const st = stockMap(ref);
+  const years = [...new Set([+t.slice(0, 4), ...DB.stockLogs.map(l => +l.date.slice(0, 4))])].sort().reverse();
+  let body = '';
+  printerNames().forEach(pn => {
+    const cs = DB.consumables.filter(c => c.printerModel === pn).sort(sortCs); if (!cs.length) return;
+    const u = printerUnits(pn, Y);
+    cs.forEach((c, i) => {
+      const lyAll = sumOut(c.id, `${Y - 1}-01-01`, `${Y - 1}-12-31`), lySame = sumOut(c.id, `${Y - 1}-01-01`, lyRef), ty = sumOut(c.id, `${Y}-01-01`, ref);
+      const rate = lySame ? (ty - lySame) / lySame * 100 : null;
+      const rateTxt = rate == null ? '-' : `<span class="${rate >= 20 ? 'txt-red' : rate <= -20 ? '' : ''}">${rate >= 0 ? '▲' : '▼'} ${fmt1(Math.abs(rate))}%</span>`;
+      body += `<tr><td data-v="${h(pn)}">${i === 0 || S.tsort['cons.cmp.0'] ? `<b>${h(pn)}</b><br><span class="muted">운영 ${u.op}대${u.excluded ? ` (올해 불용 예정 ${u.excluded}대 제외)` : ''} · 작년 ${u.ly}대</span>` : `<span class="muted">${h(pn)}</span>`}</td>
+        <td>${h(c.kind)}</td><td>${h(c.name)}</td><td class="n">${fmtN(lyAll)}</td><td class="n">${fmtN(lySame)}</td><td class="n"><b>${fmtN(ty)}</b></td><td class="n"${rate == null ? '' : ` data-v="${rate}"`}>${rateTxt}</td><td class="n">${fmtN(st[c.id])}</td></tr>`;
+    });
+  });
+  return `<div class="panel"><div class="filters"><label>연도</label>${fSel('cmpY', years.map(y => [y, `${y}년`]), Y, `onchange="S.cmpYear=+this.value;render()"`)}
+    <span class="muted">올해 누적·작년 같은 기간은 ${ref.slice(5)} 까지 기준 (작년 ${lyRef})</span></div>
+  <div class="tablewrap"><table class="t"><thead><tr><th>프린터 모델</th><th>종류</th><th>품명</th><th class="n">작년 연간 불출</th><th class="n">작년 같은 기간 누적</th><th class="n">올해 누적 불출</th><th class="n">증감(동기 대비)</th><th class="n">현재 재고</th></tr></thead><tbody>${body || '<tr><td colspan="8" class="empty">자료가 없습니다.</td></tr>'}</tbody></table></div></div>`;
+}
+
+function planData() {
+  const t = TODAY(); const { y, q } = S.pq;
+  const key = `${y}-${q}`;
+  const qs = qStart(y, q), qe = qEnd(y, q);
+  const ref = (t >= qs && t <= qe) ? t : qs; // 기준일: 진행 중 분기면 오늘, 아니면 분기 시작일
+  const st = stockMap(ref);
+  const plans = DB.settings.purchasePlans[key] || {};
+  const rows = [];
+  const me = monthsElapsed(ref), remain = Math.max(0, 12 - me);
+  printerNames().forEach(pn => {
+    const u = printerUnits(pn, y);
+    DB.consumables.filter(c => c.printerModel === pn).sort(sortCs).forEach(c => {
+      const stock = st[c.id] || 0;
+      let suggest, basis, short = false;
+      if (q <= 2) {
+        const lyOut = sumOut(c.id, `${y - 1}-01-01`, `${y - 1}-12-31`);
+        const per = u.ly ? lyOut / u.ly : 0;
+        suggest = Math.max(0, Math.ceil(per * u.op - stock - 1e-9));
+        basis = `작년 불출 ${fmtN(lyOut)} ÷ ${u.ly}대 = 대당 ${fmt1(per)} × ${u.op}대 = ${fmt1(per * u.op)}`;
+      } else {
+        const tyOut = sumOut(c.id, `${y}-01-01`, ref);
+        const avg = me > 0 ? tyOut / me : 0;
+        const exhaust = avg > 0 ? stock / avg : Infinity;
+        short = exhaust < remain;
+        suggest = Math.max(0, Math.ceil(avg * remain - stock - 1e-9));
+        basis = `월평균 ${fmt1(avg)} × 남은 ${fmt1(remain)}개월 = ${fmt1(avg * remain)} / 소진 예상 ${exhaust === Infinity ? '-' : fmt1(exhaust) + '개월'}`;
+      }
+      const conf = plans[c.id] != null ? plans[c.id] : suggest;
+      rows.push({ c, pn, u, stock, suggest, conf, basis, short, amount: conf * (Number(c.price) || 0), edited: plans[c.id] != null && plans[c.id] !== suggest });
+    });
+  });
+  if (q >= 3) rows.sort((a, b) => (b.short - a.short) || cmp(a.pn, b.pn));
+  const total = rows.reduce((s, r) => s + r.amount, 0);
+  const budget = Number(DB.settings.budgets[key]) || 0;
+  return { key, ref, rows, total, budget, remainAmt: budget - total, me, remain };
+}
+function renderPlan() {
+  const t = TODAY();
+  if (!S.pq) S.pq = { y: +t.slice(0, 4), q: qOf(t) };
+  const P = planData(), { y, q } = S.pq;
+  const yOpts = [+t.slice(0, 4) - 1, +t.slice(0, 4), +t.slice(0, 4) + 1].map(v => [v, `${v}년`]);
+  let prevPn = null;
+  const body = P.rows.map(r => {
+    const first = r.pn !== prevPn || q >= 3 || !!S.tsort['cons.plan.0']; prevPn = r.pn;
+    return `<tr class="${r.short ? 'rowshort' : ''}"><td data-v="${h(r.pn)}">${first ? `<b>${h(r.pn)}</b>` : ''}</td><td class="n" data-v="${r.u.op}">${first ? `${r.u.op}대${r.u.excluded ? `<br><span class="muted">불용 예정 ${r.u.excluded}대 제외</span>` : ''}` : ''}</td>
+      <td>${h(r.c.kind)}</td><td>${h(r.c.name)} ${r.short ? '<span class="badge b-orange">부족 품목</span>' : ''}</td><td class="n">${fmtN(r.stock)}</td>
+      <td class="n" title="${h(r.basis)}">${fmtN(r.suggest)}</td>
+      <td class="n"><input type="number" min="0" value="${r.conf}" onchange="setPlan(${ja(r.c.id)},this.value)" style="${r.edited ? 'background:#fffbe6;border-color:#f0c36d' : ''}"></td>
+      <td class="n">${fmtN(r.c.price)}</td><td class="n"><b>${fmtN(r.amount)}</b></td><td class="muted" style="font-size:11px">${h(r.basis)}</td></tr>`;
+  }).join('');
+  const over = P.remainAmt < 0;
+  return `<div class="panel">
+    <div class="filters"><label>연도</label>${fSel('pqY', yOpts, y, `onchange="S.pq.y=+this.value;render()"`)}
+      <label>분기</label>${fSel('pqQ', [[1, '1분기'], [2, '2분기'], [3, '3분기'], [4, '4분기']], q, `onchange="S.pq.q=+this.value;render()"`)}
+      <label>분기 예산(원)</label><input id="pqBudget" type="number" min="0" step="10000" value="${P.budget || ''}" style="width:140px" onchange="setBudget(this.value)">
+      <div class="spacer"></div>
+      <button class="btn" onclick="resetPlan()">확정 수량을 제안값으로 되돌리기</button>
+      <button class="btn primary" onclick="exportPlan()">📥 엑셀 내보내기</button></div>
+    <div class="kv"><span>산정 기준일 <b>${P.ref}</b></span>
+      <span>${q <= 2 ? '<b>1·2분기 — 연간 소요</b>: (작년 대당 연간 소모량 × 올해 운영 대수) − 현재 재고' : `<b>3·4분기 — 부족분 보충</b>: (올해 월평균 소모량 × 연말까지 남은 ${fmt1(P.remain)}개월) − 현재 재고. 소진 예상이 남은 기간보다 짧으면 <span class="badge b-orange">부족 품목</span>`}</span>
+      <span class="muted">운영 대수 = 올해 안에 불용 대상이 되는 프린터 제외. 확정 수량은 직접 수정할 수 있습니다.</span></div>
+    <div class="tablewrap"><table class="t"><thead><tr><th>프린터 모델</th><th class="n">운영 대수</th><th>종류</th><th>품명</th><th class="n">현재 재고</th><th class="n">제안 수량</th><th class="n">확정 수량</th><th class="n">단가(원)</th><th class="n">금액(원)</th><th>산정 근거</th></tr></thead>
+    <tbody>${body || '<tr><td colspan="10" class="empty">등록된 소모품이 없습니다.</td></tr>'}</tbody></table></div>
+    <div class="sumbar"><span>합계 금액 <b>${fmtN(P.total)}</b>원</span><span>예산 <b>${fmtN(P.budget)}</b>원</span><span class="${over ? 'over' : ''}">잔액 <b>${fmtN(P.remainAmt)}</b>원 ${over ? '⚠ 예산 초과' : ''}</span></div>
+  </div>`;
+}
+function setPlan(cid, v) {
+  const P = S.pq, key = `${P.y}-${P.q}`; const n = Math.max(0, Math.round(Number(v) || 0));
+  DB.settings.purchasePlans[key] = DB.settings.purchasePlans[key] || {};
+  DB.settings.purchasePlans[key][cid] = n; changed();
+}
+function setBudget(v) { const P = S.pq; DB.settings.budgets[`${P.y}-${P.q}`] = Math.max(0, Number(v) || 0); changed(); }
+function resetPlan() { const P = S.pq; if (!confirm('이 분기의 확정 수량을 모두 제안 수량으로 되돌릴까요?')) return; delete DB.settings.purchasePlans[`${P.y}-${P.q}`]; changed('제안 수량으로 되돌렸습니다.'); }
+function exportPlan() {
+  const P = planData(), { y, q } = S.pq;
+  const sh = { name: '구매소요표', cols: [24, 12, 12, 30, 10, 10, 10, 12, 14, 12, 50], rows: [], merges: ['A1:K1', 'A2:K2'], freeze: 3, heights: { 0: 28 } };
+  sh.rows.push([{ v: `${y}년 ${q}분기 소모품 구매 소요`, s: X.title }]);
+  sh.rows.push([{ v: `산정 기준일: ${P.ref}    작성: ${fmtDT(new Date().toISOString())} ${WLABEL[worker]}    산정: ${q <= 2 ? '1·2분기 연간 소요 (작년 대당 소모량 × 운영 대수 − 재고)' : '3·4분기 부족분 보충 (월평균 × 남은 개월 − 재고)'}`, s: X.info }]);
+  sh.rows.push(['프린터 모델', '운영 대수', '불용예정 제외', '품명', '종류', '현재 재고', '제안 수량', '확정 수량', '단가(원)', '금액(원)', '비고(산정 근거)'].map(v => ({ v, s: X.header })));
+  P.rows.forEach(r => sh.rows.push([{ v: r.pn, s: X.cell }, { v: r.u.op, s: X.num }, { v: r.u.excluded, s: X.num }, { v: r.c.name, s: X.cell }, { v: r.c.kind, s: X.center }, { v: r.stock, s: X.num }, { v: r.suggest, s: X.num }, { v: r.conf, s: X.num }, { v: Number(r.c.price) || 0, s: X.num }, { v: r.amount, s: X.num }, { v: (r.short ? '[부족 품목] ' : '') + r.basis, s: r.short ? X.orangeL : X.cell }]));
+  const blank = s => ({ v: '', s });
+  const add = (label, val, sL, sN) => { const r = sh.rows.length + 1; sh.rows.push([{ v: label, s: sL }, blank(sL), blank(sL), blank(sL), blank(sL), blank(sL), blank(sL), blank(sL), blank(sL), { v: val, s: sN }, blank(sL)]); sh.merges.push(`A${r}:I${r}`); };
+  add('합계 금액', P.total, X.total, X.totalNum);
+  add('분기 예산', P.budget, X.sub, X.subNum);
+  add(P.remainAmt < 0 ? '잔액 (예산 초과)' : '잔액 (예산 − 합계)', P.remainAmt, P.remainAmt < 0 ? X.redSub : X.sub, P.remainAmt < 0 ? X.redSubNum : X.subNum);
+  download(buildXlsx([sh]), `${y}년_${q}분기_소모품구매소요_${stamp()}.xlsx`);
+  toast('구매 소요표 엑셀을 내려받았습니다.');
+}
+
+/* ---------- 대여현황 / 소모품 현재고 엑셀 ---------- */
+function exportRental() {
+  buildIndex();
+  const t = TODAY(), made = `기준일: ${t}    작성: ${fmtDT(new Date().toISOString())} ${WLABEL[worker]}`;
+  const eqOf = a => DB.equipment.find(e => e.assetNo === a);
+  const active = DB.loans.filter(l => !l.returnDate).sort((a, b) => cmp(a.dueDate, b.dueDate));
+  // 시트1: 대여 중
+  const s1 = { name: '대여 중', cols: [13, 9, 26, 14, 10, 18, 12, 12, 11, 14, 11], rows: [], merges: ['A1:K1', 'A2:K2'], freeze: 3, heights: { 0: 28 } };
+  s1.rows.push([{ v: '대여 중 장비 현황', s: X.title }], [{ v: made, s: X.info }]);
+  s1.rows.push(['자산번호', '종류', '모델', '대여 부서', '직책', '공문번호', '대여일', '반납예정일', '남은 일수', '상태', '대여 확인자'].map(v => ({ v, s: X.header })));
+  active.forEach(l => {
+    const e = eqOf(l.assetNo), m = e ? MM[e.modelId] : {}, d = diffDays(t, l.dueDate);
+    const st = d < 0 ? `기한 초과 ${-d}일` : d <= 7 ? '반납 임박' : '정상';
+    s1.rows.push([{ v: l.assetNo, s: X.center }, { v: m.type || '', s: X.center }, { v: m.name || '', s: X.cell }, { v: l.dept, s: X.cell }, { v: l.position, s: X.center }, { v: l.docNo, s: X.cell },
+      { v: l.loanDate, s: X.center }, { v: l.dueDate, s: X.center }, { v: d, s: X.num }, { v: st, s: d < 0 ? X.red : d <= 7 ? X.orange : X.center }, { v: WLABEL[l.loanChecker] || '', s: X.center }]);
+  });
+  if (!active.length) s1.rows.push([{ v: '대여 중인 장비가 없습니다.', s: X.cell }]);
+  const over = active.filter(l => l.dueDate < t).length, soon = active.filter(l => l.dueDate >= t && diffDays(t, l.dueDate) <= 7).length;
+  s1.rows.push([], [{ v: `대여 중 ${active.length}건 · 기한 초과 ${over}건 · 반납 임박(7일 이내) ${soon}건`, s: X.bold }]);
+  // 시트2: 모델별 요약
+  const rental = DB.equipment.filter(e => MM[e.modelId].usage === '대여용');
+  const rmodels = DB.models.filter(m => m.usage === '대여용').sort((a, b) => TYPES.indexOf(a.type) - TYPES.indexOf(b.type) || cmp(a.introDate, b.introDate));
+  const s2 = { name: '모델별 요약', cols: [9, 28, 26, 12, 12, 11, 10, 10, 10, 20], rows: [], merges: ['A1:J1', 'A2:J2'], freeze: 3, heights: { 0: 28 } };
+  s2.rows.push([{ v: '대여용 장비 모델별 현황', s: X.title }], [{ v: made, s: X.info }]);
+  s2.rows.push(['종류', '모델명', '도입사업명', '도입일', '만료일', '대여 가능', '대여 중', '불용처리', '전체', '사용연한 상태'].map(v => ({ v, s: X.header })));
+  const tot = [0, 0, 0, 0];
+  rmodels.forEach(m => {
+    const xs = rental.filter(e => e.modelId === m.id), n = st => xs.filter(e => e.status === st).length, ls = lifeStatus(m, t);
+    const v = [n('대여 가능'), n('대여 중'), n('불용처리'), xs.length]; v.forEach((x, i) => tot[i] += x);
+    s2.rows.push([{ v: m.type, s: X.center }, { v: m.name, s: X.cell }, { v: m.project, s: X.cell }, { v: m.introDate, s: X.center }, { v: expiry(m), s: X.center }, ...v.map(x => ({ v: x, s: X.num })), { v: ls, s: ls === '불용 대상' ? X.red : ls === '정상' ? X.center : X.orange }]);
+  });
+  const r2 = s2.rows.length + 1;
+  s2.rows.push([{ v: '합계', s: X.total }, ...[0, 0, 0, 0].map(() => ({ v: '', s: X.total })), ...tot.map(x => ({ v: x, s: X.totalNum })), { v: '', s: X.total }]);
+  s2.merges.push(`A${r2}:E${r2}`);
+  // 시트3: 대여용 장비 전체 목록
+  const s3 = { name: '대여용 장비 목록', cols: [13, 9, 26, 11, 16, 10, 12, 11, 20], rows: [], merges: ['A1:I1', 'A2:I2'], freeze: 3, heights: { 0: 28 } };
+  s3.rows.push([{ v: '대여용 장비 목록', s: X.title }], [{ v: made, s: X.info }]);
+  s3.rows.push(['자산번호', '종류', '모델', '상태', '대여 부서', '직책', '반납예정일', '남은 일수', '사용연한 상태'].map(v => ({ v, s: X.header })));
+  rental.slice().sort(sortEquip).forEach(e => {
+    const m = MM[e.modelId], l = LOAN_BY_ASSET[e.assetNo], ls = lifeStatus(m, t);
+    s3.rows.push([{ v: e.assetNo, s: X.center }, { v: m.type, s: X.center }, { v: m.name, s: X.cell }, { v: e.status, s: X.center }, { v: l ? l.dept : '', s: X.cell }, { v: l ? l.position : '', s: X.center },
+      { v: l ? l.dueDate : '', s: X.center }, l ? { v: diffDays(t, l.dueDate), s: X.num } : { v: '', s: X.cell }, { v: ls, s: ls === '불용 대상' ? X.red : ls === '정상' ? X.center : X.orange }]);
+  });
+  download(buildXlsx([s1, s2, s3]), `대여현황_${stamp()}.xlsx`);
+  toast('대여현황 엑셀을 내려받았습니다.');
+}
+function exportStock() {
+  const t = TODAY(), Y = t.slice(0, 4), st = stockMap(), me = monthsElapsed(t);
+  const list = DB.consumables.slice().sort(sortCs);
+  const sh = { name: '소모품 현재고', cols: [24, 12, 30, 11, 10, 14, 12, 12, 12, 20], rows: [], merges: ['A1:J1', 'A2:J2'], freeze: 3, heights: { 0: 28 } };
+  sh.rows.push([{ v: `소모품 현재고 현황 (${t} 기준)`, s: X.title }]);
+  sh.rows.push([{ v: `작성: ${fmtDT(new Date().toISOString())} ${WLABEL[worker]}    ※ 현재 재고 = 최초 재고 + 입고 − 불출 (실사 보정 반영)`, s: X.info }]);
+  sh.rows.push(['대응 프린터 모델', '종류', '품명', '단가(원)', '현재 재고', '재고 금액(원)', `${Y}년 누적 불출`, '월평균 불출', '소진 예상(개월)', '상태'].map(v => ({ v, s: X.header })));
+  let sumAmt = 0, sumQty = 0;
+  list.forEach(c => {
+    const s = st[c.id], ty = sumOut(c.id, `${Y}-01-01`, t), avg = me > 0 ? ty / me : 0, months = avg > 0 ? s / avg : null;
+    const state = s <= 0 ? '재고 없음' : months != null && months < 12 - me ? '연말 전 소진 예상' : '정상';
+    const amt = Math.max(0, s) * (Number(c.price) || 0); sumAmt += amt; sumQty += s;
+    sh.rows.push([{ v: c.printerModel, s: X.cell }, { v: c.kind, s: X.center }, { v: c.name, s: X.cell }, { v: Number(c.price) || 0, s: X.num }, { v: s, s: X.num }, { v: amt, s: X.num },
+      { v: ty, s: X.num }, { v: Math.round(avg * 10) / 10, s: X.cell }, months == null ? { v: '-', s: X.center } : { v: Math.round(months * 10) / 10, s: X.cell }, { v: state, s: state === '재고 없음' ? X.red : state === '정상' ? X.center : X.orange }]);
+  });
+  if (!list.length) sh.rows.push([{ v: '등록된 소모품이 없습니다.', s: X.cell }]);
+  const r = sh.rows.length + 1;
+  sh.rows.push([{ v: '합계', s: X.total }, { v: '', s: X.total }, { v: '', s: X.total }, { v: '', s: X.total }, { v: sumQty, s: X.totalNum }, { v: sumAmt, s: X.totalNum }, { v: '', s: X.total }, { v: '', s: X.total }, { v: '', s: X.total }, { v: '', s: X.total }]);
+  sh.merges.push(`A${r}:D${r}`);
+  download(buildXlsx([sh]), `소모품현재고_${stamp()}.xlsx`);
+  toast('소모품 현재고 엑셀을 내려받았습니다.');
+}
+
+/* =====================================================================
+   XLSX 생성 (외부 라이브러리 없이 파일 내부에서 생성)
+   ===================================================================== */
+const X = { title: 1, header: 2, cell: 3, num: 4, sub: 5, subNum: 6, bold: 7, red: 8, orange: 9, total: 10, totalNum: 11, info: 12, center: 13, orangeL: 14, redSub: 15, redSubNum: 16 };
+const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts>
+<fonts count="7">
+<font><sz val="10"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font>
+<font><b/><sz val="16"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font>
+<font><b/><sz val="10"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font>
+<font><b/><sz val="10"/><color rgb="FFC00000"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font>
+<font><b/><sz val="10"/><color rgb="FFC65911"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font>
+<font><sz val="9"/><color rgb="FF595959"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font>
+<font><sz val="10"/><color rgb="FFC65911"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font>
+</fonts>
+<fills count="6">
+<fill><patternFill patternType="none"/></fill>
+<fill><patternFill patternType="gray125"/></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFD9E1F2"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFF2F2F2"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFDDEBF7"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFFCE4E4"/><bgColor indexed="64"/></patternFill></fill>
+</fills>
+<borders count="2">
+<border><left/><right/><top/><bottom/><diagonal/></border>
+<border><left style="thin"><color rgb="FF9E9E9E"/></left><right style="thin"><color rgb="FF9E9E9E"/></right><top style="thin"><color rgb="FF9E9E9E"/></top><bottom style="thin"><color rgb="FF9E9E9E"/></bottom><diagonal/></border>
+</borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="17">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="164" fontId="2" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="3" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="2" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="164" fontId="2" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>
+<xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="6" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf numFmtId="0" fontId="3" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="164" fontId="3" fillId="5" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>
+</cellXfs>
+<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`;
+function colName(i) { let s = ''; i++; while (i > 0) { const r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = Math.floor((i - 1) / 26); } return s; }
+function xesc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ''); }
+function sheetXml(sh) {
+  const ncol = Math.max(sh.cols.length, ...sh.rows.map(r => (r || []).length));
+  let data = '';
+  sh.rows.forEach((row, ri) => {
+    const ht = sh.heights && sh.heights[ri] ? ` ht="${sh.heights[ri]}" customHeight="1"` : '';
+    let cells = '';
+    (row || []).forEach((c, ci) => {
+      if (c == null) return; if (typeof c !== 'object') c = { v: c };
+      const ref = colName(ci) + (ri + 1), s = c.s || 0;
+      if (c.v === '' || c.v == null) cells += `<c r="${ref}" s="${s}"/>`;
+      else if (typeof c.v === 'number' && isFinite(c.v)) cells += `<c r="${ref}" s="${s}"><v>${c.v}</v></c>`;
+      else cells += `<c r="${ref}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${xesc(c.v)}</t></is></c>`;
+    });
+    data += `<row r="${ri + 1}"${ht}>${cells}</row>`;
+  });
+  const last = colName(ncol - 1) + Math.max(1, sh.rows.length);
+  const pane = sh.freeze ? `<pane ySplit="${sh.freeze}" topLeftCell="A${sh.freeze + 1}" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A${sh.freeze + 1}" sqref="A${sh.freeze + 1}"/>` : '';
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${last}"/>
+<sheetViews><sheetView workbookViewId="0">${pane}</sheetView></sheetViews>
+<sheetFormatPr defaultRowHeight="16.5"/>
+<cols>${sh.cols.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols>
+<sheetData>${data}</sheetData>
+${sh.merges && sh.merges.length ? `<mergeCells count="${sh.merges.length}">${sh.merges.map(m => `<mergeCell ref="${m}"/>`).join('')}</mergeCells>` : ''}
+<printOptions horizontalCentered="1"/>
+<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>
+<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>
+<headerFooter><oddFooter>&amp;C&amp;P / &amp;N</oddFooter></headerFooter>
+</worksheet>`;
+}
+function buildXlsx(sheets) {
+  const files = [];
+  files.push({ name: '[Content_Types].xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheets.map((s, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>` });
+  files.push({ name: '_rels/.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>` });
+  const defs = sheets.map((s, i) => s.freeze ? `<definedName name="_xlnm.Print_Titles" localSheetId="${i}">'${xesc(s.name)}'!$${s.freeze}:$${s.freeze}</definedName>` : '').join('');
+  files.push({ name: 'xl/workbook.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets>${sheets.map((s, i) => `<sheet name="${xesc(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets>${defs ? `<definedNames>${defs}</definedNames>` : ''}</workbook>` });
+  files.push({ name: 'xl/_rels/workbook.xml.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((s, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` });
+  files.push({ name: 'xl/styles.xml', data: STYLES_XML });
+  sheets.forEach((s, i) => files.push({ name: `xl/worksheets/sheet${i + 1}.xml`, data: sheetXml(s) }));
+  return zipStore(files, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+}
+const CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(u8) { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function zipStore(files, mime) {
+  const enc = new TextEncoder(), parts = [], central = []; let offset = 0;
+  const now = new Date();
+  const dt = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const dd = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  files.forEach(f => {
+    const nm = enc.encode(f.name), data = typeof f.data === 'string' ? enc.encode(f.data) : f.data, crc = crc32(data);
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+    lh.setUint16(10, dt, true); lh.setUint16(12, dd, true); lh.setUint32(14, crc, true); lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true);
+    lh.setUint16(26, nm.length, true); lh.setUint16(28, 0, true);
+    parts.push(new Uint8Array(lh.buffer), nm, data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(10, 0, true);
+    ch.setUint16(12, dt, true); ch.setUint16(14, dd, true); ch.setUint32(16, crc, true); ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true);
+    ch.setUint16(28, nm.length, true); ch.setUint16(30, 0, true); ch.setUint16(32, 0, true); ch.setUint16(34, 0, true); ch.setUint16(36, 0, true); ch.setUint32(38, 0, true); ch.setUint32(42, offset, true);
+    central.push(new Uint8Array(ch.buffer), nm);
+    offset += 30 + nm.length + data.length;
+  });
+  const cdSize = central.reduce((a, b) => a + b.length, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true); end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, new Uint8Array(end.buffer)], { type: mime });
+}
+
+/* =====================================================================
+   시작
+   ===================================================================== */
+(function init() {
+  try { const w = localStorage.getItem('rmh.worker'); if (w === '정' || w === '부') worker = w; } catch (e) { }
+  let restored = false;
+  try {
+    const raw = localStorage.getItem('rmh.work');
+    if (raw) { const o = JSON.parse(raw); if (o && o.data && Array.isArray(o.data.models)) { DB = normalize(o.data); dirty = !!o.dirty; loadedName = o.loadedName || null; restored = true; } }
+  } catch (e) { }
+  if (!DB) { DB = makeSample(); persist(); }
+  // 변경 내역 비교 기준(마지막 저장·불러오기 시점) 복원
+  try {
+    const b = JSON.parse(localStorage.getItem('rmh.base') || 'null');
+    if (restored && b && b.data && Array.isArray(b.data.models)) { BASE = normalize(b.data); BASE_MODE = b.mode || 'file'; }
+  } catch (e) { }
+  if (!BASE) setBaseline(restored && dirty ? 'unknown' : 'file');
+  render();
+  if (restored) toast(dirty ? '이전 작업 상태를 복원했습니다. (파일로 저장하지 않은 변경 있음)' : '이전 작업 상태를 복원했습니다.');
+})();
+</script>
+</body>
+</html>
