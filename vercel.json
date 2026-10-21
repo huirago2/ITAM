@@ -1,4 +1,5 @@
 {
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- 자원관리도우미.html",
   "cleanUrls": false,
   "rewrites": [
     { "source": "/", "destination": "/자원관리도우미.html" }
